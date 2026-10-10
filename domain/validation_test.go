@@ -2,6 +2,7 @@ package domain
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -21,6 +22,14 @@ func TestCallValidate(t *testing.T) {
 		{
 			name: "empty object arguments",
 			call: Call{ToolName: "read_file", Arguments: []byte(`{}`)},
+		},
+		{
+			name: "nested object arguments",
+			call: Call{ToolName: "read_file", Arguments: []byte(`{"options":{"recursive":true}}`)},
+		},
+		{
+			name: "whitespace around object",
+			call: Call{ToolName: "read_file", Arguments: []byte(" \n{}\t ")},
 		},
 		{
 			name:      "empty tool name",
@@ -46,6 +55,20 @@ func TestCallValidate(t *testing.T) {
 		{
 			name:      "malformed JSON",
 			call:      Call{ToolName: "read_file", Arguments: []byte(`{"path":`)},
+			want:      ErrInvalidArguments.Error(),
+			wantField: "arguments",
+			wantKind:  ErrInvalidArguments,
+		},
+		{
+			name:      "trailing JSON value",
+			call:      Call{ToolName: "read_file", Arguments: []byte(`{} {}`)},
+			want:      ErrInvalidArguments.Error(),
+			wantField: "arguments",
+			wantKind:  ErrInvalidArguments,
+		},
+		{
+			name:      "invalid UTF-8 in JSON",
+			call:      Call{ToolName: "read_file", Arguments: []byte("{\"path\":\"\xff\"}")},
 			want:      ErrInvalidArguments.Error(),
 			wantField: "arguments",
 			wantKind:  ErrInvalidArguments,
@@ -106,5 +129,24 @@ func TestCallValidate(t *testing.T) {
 				t.Errorf("Validate() error contains raw arguments: %q", err)
 			}
 		})
+	}
+}
+
+func TestValidationErrorSupportsWrapping(t *testing.T) {
+	err := fmt.Errorf("validate incoming call: %w", &ValidationError{
+		field: "arguments",
+		kind:  ErrInvalidArguments,
+	})
+
+	if !errors.Is(err, ErrInvalidArguments) {
+		t.Fatalf("errors.Is(%v, ErrInvalidArguments) = false", err)
+	}
+
+	var validationError *ValidationError
+	if !errors.As(err, &validationError) {
+		t.Fatalf("errors.As(%v, *ValidationError) = false", err)
+	}
+	if got, want := validationError.Field(), "arguments"; got != want {
+		t.Errorf("ValidationError.Field() = %q; want %q", got, want)
 	}
 }
