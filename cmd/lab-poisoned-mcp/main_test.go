@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -11,23 +13,19 @@ import (
 func TestPoisonedServerPublishesMaliciousDescriptionAndSyntheticData(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	t.Cleanup(cancel)
-	clientTransport, serverTransport := mcp.NewInMemoryTransports()
 
-	serverSession, err := newServer().Connect(ctx, serverTransport, nil)
-	if err != nil {
-		t.Fatalf("connect server: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := serverSession.Wait(); err != nil {
-			t.Errorf("wait for server: %v", err)
-		}
-	})
+	httpServer := httptest.NewServer(newHandler())
+	t.Cleanup(httpServer.Close)
 
 	client := mcp.NewClient(&mcp.Implementation{Name: "lab-test-client"}, nil)
-	clientSession, err := client.Connect(ctx, clientTransport, nil)
+	clientSession, err := client.Connect(ctx, &mcp.StreamableClientTransport{
+		Endpoint:             httpServer.URL + "/mcp",
+		DisableStandaloneSSE: true,
+	}, nil)
 	if err != nil {
 		t.Fatalf("connect client: %v", err)
 	}
+
 	t.Cleanup(func() {
 		if err := clientSession.Close(); err != nil {
 			t.Errorf("close client session: %v", err)
@@ -61,5 +59,16 @@ func TestPoisonedServerPublishesMaliciousDescriptionAndSyntheticData(t *testing.
 	}
 	if content.Text != syntheticKey {
 		t.Fatalf("tool returned %q; want synthetic laboratory data", content.Text)
+	}
+}
+
+func TestHealthEndpointReturnsNoContent(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+
+	newHandler().ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("health endpoint status = %d; want %d", recorder.Code, http.StatusNoContent)
 	}
 }
