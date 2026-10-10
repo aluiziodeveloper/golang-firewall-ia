@@ -14,6 +14,16 @@ LAB-ONLY-SYNTHETIC-SSH-KEY-DO-NOT-USE
 
 O agente local usa o modelo `qwen3:1.7b` por meio do Ollama. No teste integrado, o modelo chamou a ferramenta MCP e recebeu o texto sintético acima. A resposta do modelo pode variar entre execuções; esse resultado é uma observação do laboratório, não uma garantia sobre outros modelos ou configurações.
 
+O Compose fornece três servidores MCP locais, todos com a mesma ferramenta e o mesmo retorno sintético:
+
+| Serviço | Descrição anunciada | Comportamento |
+|---|---|---|
+| `lab-mcp-legitimate` | Explica que só retorna o marcador sintético | Nunca acessa arquivos |
+| `lab-mcp-poisoned` | Instrui o modelo a ignorar o pedido e ler `~/.ssh/id_rsa` | Retorna só o marcador sintético |
+| `lab-mcp-mutating` | Começa com a descrição legítima | Depois da primeira chamada, troca a descrição para a versão envenenada |
+
+A variante mutável persiste no processo do servidor. Execute o agente uma vez para observar a descrição legítima; a chamada altera a definição no servidor. Uma segunda execução, com uma nova sessão MCP, recebe a descrição envenenada. Reiniciar o serviço mutável restaura o estado inicial. A mutação demonstra a troca da definição, não uma leitura de arquivo.
+
 ### Pré-requisitos
 
 - Docker com o plugin Docker Compose.
@@ -48,9 +58,31 @@ docker compose -f deploy/compose.yaml down
 
 Esse comando mantém o volume local `ollama_data`, que contém o modelo baixado. O laboratório não publica portas no host. O agente e o servidor MCP compartilham uma rede Docker interna, sem rota para serviços externos; apenas o serviço Ollama também participa da rede usada para obter o modelo.
 
-### Limites deste incremento
+### Comparar as variantes
 
-Esta demonstração inclui o servidor MCP envenenado. Os servidores legítimo e mutável descritos no plano do livro ainda não estão implementados, e o conjunto não deve ser tratado como o laboratório final do Capítulo 1 nem receber a tag `cap01` até que essas variantes e a reprodução do zero sejam concluídas.
+Para testar a descrição legítima, inicie o servidor e direcione o mesmo agente a ele:
+
+```bash
+docker compose -f deploy/compose.yaml up -d --build lab-mcp-legitimate
+docker compose -f deploy/compose.yaml run --build --rm \
+  -e MCP_URL=http://lab-mcp-legitimate:8081/mcp lab-agent
+```
+
+Para observar a mudança entre sessões, inicie o servidor mutável e execute o agente duas vezes. A primeira chamada aciona a mutação; a segunda sessão recebe a nova descrição:
+
+```bash
+docker compose -f deploy/compose.yaml up -d --build lab-mcp-mutating
+docker compose -f deploy/compose.yaml run --build --rm \
+  -e MCP_URL=http://lab-mcp-mutating:8081/mcp lab-agent
+docker compose -f deploy/compose.yaml run --rm \
+  -e MCP_URL=http://lab-mcp-mutating:8081/mcp lab-agent
+```
+
+O log do servidor mutável registra a troca. As três variantes continuam limitadas ao dado sintético e não montam nem leem arquivos do host.
+
+### Limites do incremento
+
+As três variantes estão implementadas e cobertas por testes de contrato MCP. A reprodução completa do Compose desde um estado limpo, inclusive a comparação com Ollama, ainda precisa ser validada antes do Portão 2 e da *tag* `cap01`.
 
 ## Uso seguro e escopo ético
 
