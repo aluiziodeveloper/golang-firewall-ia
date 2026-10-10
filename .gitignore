@@ -1,0 +1,15 @@
+# Binários e cobertura
+/guarita
+/coverage.out
+/coverage.html
+*.test
+
+# Segredos e configurações locais
+.env
+.env.*
+!.env.example
+
+# Ferramentas e sistema operacional
+.idea/
+.DS_Store
+Thumbs.db
