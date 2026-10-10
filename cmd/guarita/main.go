@@ -16,7 +16,10 @@ func main() {
 	}
 }
 
+// #region cmd-guarita-startup
 func run(stderr io.Writer) error {
 	_, err := fmt.Fprintln(stderr, startupMessage)
 	return err
 }
+
+// #endregion

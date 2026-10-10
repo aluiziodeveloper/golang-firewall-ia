@@ -49,6 +49,7 @@ services:
       - ollama_data:/root/.ollama
     restart: "no"
 
+  # #region deploy-lab-mcp-variants
   lab-mcp-legitimate:
     <<: *lab-mcp-server
     command: ["/lab-mcp", "-mode", "legitimate"]
@@ -66,6 +67,7 @@ services:
     command: ["/lab-mcp", "-mode", "mutating"]
     environment:
       MCP_ADDR: 0.0.0.0:8081
+  # #endregion
 
   lab-agent:
     build:

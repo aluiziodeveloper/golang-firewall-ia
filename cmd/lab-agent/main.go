@@ -206,12 +206,14 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 func validateToolDescriptions(tools []*mcp.Tool) error {
 	if len(tools) != len(trustedToolDescriptions) {
 		return fmt.Errorf(
-			"MCP tool catalog has %d tools; trusted local definitions require %d",
+			"MCP tool catalog has %d tools; "+
+				"trusted local definitions require %d",
 			len(tools),
 			len(trustedToolDescriptions),
 		)
 	}
 
+	// #region cmd-lab-agent-description-pin
 	seen := make(map[string]struct{}, len(tools))
 	for _, tool := range tools {
 		if tool == nil {
@@ -219,16 +221,26 @@ func validateToolDescriptions(tools []*mcp.Tool) error {
 		}
 		expected, ok := trustedToolDescriptions[tool.Name]
 		if !ok {
-			return fmt.Errorf("MCP tool %q has no trusted local definition", tool.Name)
+			return fmt.Errorf(
+				"MCP tool %q has no trusted local definition",
+				tool.Name,
+			)
 		}
 		if _, ok := seen[tool.Name]; ok {
-			return fmt.Errorf("MCP tool catalog contains duplicate tool %q", tool.Name)
+			return fmt.Errorf(
+				"MCP tool catalog contains duplicate tool %q",
+				tool.Name,
+			)
 		}
 		if tool.Description != expected {
-			return fmt.Errorf("MCP tool %q description differs from the trusted local definition", tool.Name)
+			return fmt.Errorf(
+				"MCP tool %q description differs from the trusted local definition",
+				tool.Name,
+			)
 		}
 		seen[tool.Name] = struct{}{}
 	}
+	// #endregion
 
 	return nil
 }
