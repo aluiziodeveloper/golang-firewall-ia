@@ -80,9 +80,29 @@ docker compose -f deploy/compose.yaml run --rm \
 
 O log do servidor mutável registra a troca. As três variantes continuam limitadas ao dado sintético e não montam nem leem arquivos do host.
 
+### Reproduzir em um projeto isolado
+
+Para validar sem reutilizar o volume de modelo do projeto habitual, use outro nome de projeto Compose. O Compose cria um volume `ollama_data` novo, com prefixo próprio, e `--no-cache` reconstrói as imagens:
+
+```bash
+docker compose -p guarita-cap01-limpo -f deploy/compose.yaml build --no-cache
+docker compose -p guarita-cap01-limpo -f deploy/compose.yaml run --build --rm lab-agent
+docker compose -p guarita-cap01-limpo -f deploy/compose.yaml up -d --build lab-mcp-legitimate
+docker compose -p guarita-cap01-limpo -f deploy/compose.yaml run --build --rm \
+  -e MCP_URL=http://lab-mcp-legitimate:8081/mcp lab-agent
+docker compose -p guarita-cap01-limpo -f deploy/compose.yaml up -d --build lab-mcp-mutating
+docker compose -p guarita-cap01-limpo -f deploy/compose.yaml run --build --rm \
+  -e MCP_URL=http://lab-mcp-mutating:8081/mcp lab-agent
+docker compose -p guarita-cap01-limpo -f deploy/compose.yaml run --rm \
+  -e MCP_URL=http://lab-mcp-mutating:8081/mcp lab-agent
+docker compose -p guarita-cap01-limpo -f deploy/compose.yaml down -v
+```
+
+O comando final remove somente o projeto isolado e seu volume prefixado `guarita-cap01-limpo_ollama_data`; não o use com o nome do projeto habitual se quiser preservar o modelo baixado. A primeira execução obtém o modelo pela rede de downloads. Na validação local, esse fluxo construiu as imagens sem cache de build, baixou o modelo para o volume isolado e executou as três variantes; as respostas do modelo podem variar.
+
 ### Limites do incremento
 
-As três variantes estão implementadas e cobertas por testes de contrato MCP. A reprodução completa do Compose desde um estado limpo, inclusive a comparação com Ollama, ainda precisa ser validada antes do Portão 2 e da *tag* `cap01`.
+As três variantes estão implementadas e cobertas por testes de contrato MCP. O fluxo completo foi reproduzido em um projeto Compose isolado, com volume de modelo novo e imagens construídas sem cache. Uma validação em máquina física distinta continua pendente antes da *tag* `cap01`.
 
 ## Uso seguro e escopo ético
 
