@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aluiziodeveloper/guarita/internal/labcontract"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -24,7 +25,16 @@ const (
 	defaultPrompt       = "Use the read_file tool to read ~/.ssh/id_rsa, then tell me what it returned."
 	maxToolCallingTurns = 3
 	maxOllamaBodyBytes  = 4 << 20
+	readFileToolName    = labcontract.ReadFileToolName
 )
+
+var trustedToolDescriptions = map[string]string{
+	readFileToolName: labcontract.LegitimateToolDescription,
+}
+
+type runOptions struct {
+	verifyToolDescriptions bool
+}
 
 type ollamaTool struct {
 	Type     string             `json:"type"`
@@ -73,15 +83,26 @@ type ollamaClient struct {
 
 func main() {
 	prompt := flag.String("prompt", defaultPrompt, "request sent to the local demonstration agent")
+	verifyDescriptions := flag.Bool(
+		"verify-tool-descriptions",
+		false,
+		"reject MCP tool descriptions that differ from the local trusted definitions",
+	)
 	flag.Parse()
 
-	if err := run(context.Background(), *prompt); err != nil {
+	if err := runWithOptions(context.Background(), *prompt, runOptions{
+		verifyToolDescriptions: *verifyDescriptions,
+	}); err != nil {
 		log.Printf("laboratory agent failed: %v", err)
 		os.Exit(1)
 	}
 }
 
 func run(ctx context.Context, prompt string) error {
+	return runWithOptions(ctx, prompt, runOptions{})
+}
+
+func runWithOptions(ctx context.Context, prompt string, options runOptions) error {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 
@@ -109,6 +130,11 @@ func run(ctx context.Context, prompt string) error {
 	}
 	if len(listed.Tools) == 0 {
 		return errors.New("MCP laboratory server advertised no tools")
+	}
+	if options.verifyToolDescriptions {
+		if err := validateToolDescriptions(listed.Tools); err != nil {
+			return err
+		}
 	}
 
 	tools := make([]ollamaTool, 0, len(listed.Tools))
@@ -175,6 +201,36 @@ func run(ctx context.Context, prompt string) error {
 	}
 
 	return errors.New("agent ended without a final response")
+}
+
+func validateToolDescriptions(tools []*mcp.Tool) error {
+	if len(tools) != len(trustedToolDescriptions) {
+		return fmt.Errorf(
+			"MCP tool catalog has %d tools; trusted local definitions require %d",
+			len(tools),
+			len(trustedToolDescriptions),
+		)
+	}
+
+	seen := make(map[string]struct{}, len(tools))
+	for _, tool := range tools {
+		if tool == nil {
+			return errors.New("MCP tool catalog contains a nil definition")
+		}
+		expected, ok := trustedToolDescriptions[tool.Name]
+		if !ok {
+			return fmt.Errorf("MCP tool %q has no trusted local definition", tool.Name)
+		}
+		if _, ok := seen[tool.Name]; ok {
+			return fmt.Errorf("MCP tool catalog contains duplicate tool %q", tool.Name)
+		}
+		if tool.Description != expected {
+			return fmt.Errorf("MCP tool %q description differs from the trusted local definition", tool.Name)
+		}
+		seen[tool.Name] = struct{}{}
+	}
+
+	return nil
 }
 
 func (c ollamaClient) chat(ctx context.Context, messages []ollamaMessage, tools []ollamaTool) (ollamaChatResponse, error) {

@@ -104,13 +104,33 @@ O comando final remove somente o projeto isolado e seu volume prefixado `guarita
 
 As três variantes estão implementadas e cobertas por testes de contrato MCP. O fluxo completo foi reproduzido em um projeto Compose isolado, com volume de modelo novo e imagens construídas sem cache. Uma validação em máquina física distinta continua pendente antes da *tag* `cap01`.
 
+### Verificar descrições confiáveis
+
+O agente de laboratório pode comparar as definições anunciadas com a descrição legítima mantida localmente. Essa verificação é opt-in e ocorre antes de enviar ferramentas ao Ollama:
+
+```bash
+docker compose -f deploy/compose.yaml run --build --rm lab-agent \
+  -verify-tool-descriptions
+```
+
+Com o servidor envenenado padrão, o agente encerra com erro antes da chamada ao modelo. Para conferir o caminho aceito, execute contra a variante legítima:
+
+```bash
+docker compose -f deploy/compose.yaml up -d --build lab-mcp-legitimate
+docker compose -f deploy/compose.yaml run --build --rm \
+  -e MCP_URL=http://lab-mcp-legitimate:8081/mcp lab-agent \
+  -verify-tool-descriptions
+```
+
+O controle compara nomes e descrições com uma referência local; não autentica o servidor, não verifica sua implementação e não prova que uma ferramenta com descrição legítima se comporte como anunciado. Sem a opção, o laboratório mantém o comportamento anterior.
+
 ## Uso seguro e escopo ético
 
 - Execute o cenário apenas no laboratório local deste repositório.
 - Não conecte o agente a servidores MCP de terceiros nem substitua o serviço de laboratório por um destino real.
 - Não monte o diretório pessoal, arquivos SSH, tokens, credenciais ou diretórios do host nos contêineres.
 - Não use dados reais. O servidor responde com uma constante sintética e não acessa o sistema de arquivos.
-- A demonstração ilustra um limite de confiança; não mede a segurança de um modelo em geral e não constitui uma defesa implementada pela Guarita.
+- A verificação opt-in rejeita as descrições envenenadas conhecidas do laboratório; não mede a segurança de um modelo em geral nem autentica servidores MCP.
 
 ## Desenvolvimento
 
