@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: Go checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Check formatting with gofumpt
+        run: |
+          files="$(go run mvdan.cc/gofumpt@v0.12.0 -l .)"
+          if [ -n "$files" ]; then
+            printf '%s\n' "$files"
+            exit 1
+          fi
+
+      - name: Run tests
+        if: hashFiles('**/*.go') != ''
+        run: go test -race ./...
+
+      - name: Run go vet
+        if: hashFiles('**/*.go') != ''
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        if: hashFiles('**/*.go') != ''
+        uses: golangci/golangci-lint-action@v9.3.0
+        with:
+          version: v2.14.0
