@@ -100,7 +100,7 @@ go vet ./...
 go build ./...
 ```
 
-O SDK oficial MCP para Go está fixado em `github.com/modelcontextprotocol/go-sdk v1.8.0`. A versão mínima de Go para o projeto ainda é provisória; atualmente `go.mod` declara Go 1.27.0.
+O SDK oficial MCP para Go está fixado em `github.com/modelcontextprotocol/go-sdk v1.8.0`. A versão mínima de Go definida para o projeto é 1.27.0, declarada em `go.mod`; o SDK aceita Go 1.25.0, mas a Guarita mantém deliberadamente uma base mais recente.
 
 ## Licença
 
