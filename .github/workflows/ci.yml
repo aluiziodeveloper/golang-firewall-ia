@@ -20,7 +20,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7.0.0
         with:
-          go-version-file: go.mod
+          # go.mod declara a versão mínima; a CI testa a correção mais
+          # recente da mesma linha.
+          go-version: "1.27.x"
+          check-latest: true
           cache: true
 
       - name: Check formatting with gofumpt
@@ -33,15 +36,15 @@ jobs:
 
       # #region ci-go-validation
       - name: Run tests
-        if: hashFiles('**/*.go') != ''
         run: go test -race ./...
 
       - name: Run go vet
-        if: hashFiles('**/*.go') != ''
         run: go vet ./...
 
+      - name: Build
+        run: go build ./...
+
       - name: Run golangci-lint
-        if: hashFiles('**/*.go') != ''
         uses: golangci/golangci-lint-action@v9.3.0
         with:
           version: v2.14.0
