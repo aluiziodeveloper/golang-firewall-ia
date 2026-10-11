@@ -5,6 +5,7 @@ import (
 	"testing"
 )
 
+// #region domain-decision-validate-test
 func TestDecisionValidate(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -15,9 +16,11 @@ func TestDecisionValidate(t *testing.T) {
 		{name: "deny", decision: DecisionDeny},
 		{name: "require approval", decision: DecisionRequireApproval},
 		{name: "empty decision", wantErr: true},
-		{name: "unknown decision", decision: Decision("execute"), wantErr: true},
-		{name: "case mismatch", decision: Decision("ALLOW"), wantErr: true},
+		{name: "unknown decision", decision: "execute", wantErr: true},
+		{name: "case mismatch", decision: "ALLOW", wantErr: true},
 	}
+
+	// #endregion
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -43,7 +46,8 @@ func TestDecisionValidate(t *testing.T) {
 			if got, want := validationError.Field(), "decision"; got != want {
 				t.Errorf("ValidationError.Field() = %q; want %q", got, want)
 			}
-			if got, want := err.Error(), ErrInvalidDecision.Error(); got != want {
+			want := ErrInvalidDecision.Error()
+			if got := err.Error(); got != want {
 				t.Errorf("Validate() error = %q; want %q", got, want)
 			}
 		})

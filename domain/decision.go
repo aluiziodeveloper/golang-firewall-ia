@@ -1,6 +1,7 @@
 package domain
 
-// Validate reports whether the decision is one of the supported outcomes.
+// #region domain-decision-validate
+// Validate reports whether the decision is a supported outcome.
 func (decision Decision) Validate() error {
 	switch decision {
 	case DecisionAllow, DecisionDeny, DecisionRequireApproval:
@@ -9,3 +10,5 @@ func (decision Decision) Validate() error {
 		return &ValidationError{field: "decision", kind: ErrInvalidDecision}
 	}
 }
+
+// #endregion
