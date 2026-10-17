@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
+	"github.com/aluiziodeveloper/guarita/internal/labcontract"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -104,6 +107,7 @@ func TestLegitimateServerReturnsOnlySyntheticData(t *testing.T) {
 	if got := tools.Tools[0].Description; got != legitimateDescription {
 		t.Fatalf("tool description = %q; want legitimate description", got)
 	}
+	assertTrustedSchema(t, tools.Tools[0].InputSchema)
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      readFileToolName,
@@ -225,4 +229,25 @@ func resultText(t *testing.T, result *mcp.CallToolResult) string {
 		t.Fatalf("content type = %T; want *mcp.TextContent", result.Content[0])
 	}
 	return content.Text
+}
+
+// assertTrustedSchema confere que o esquema anunciado é o do contrato
+// do laboratório, para que o pin do agente e o servidor não divirjam.
+func assertTrustedSchema(t *testing.T, advertised any) {
+	t.Helper()
+	encoded, err := json.Marshal(advertised)
+	if err != nil {
+		t.Fatalf("encode advertised schema: %v", err)
+	}
+	var got, want any
+	if err := json.Unmarshal(encoded, &got); err != nil {
+		t.Fatalf("decode advertised schema: %v", err)
+	}
+	err = json.Unmarshal([]byte(labcontract.ReadFileInputSchema), &want)
+	if err != nil {
+		t.Fatalf("decode trusted schema: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("advertised schema = %s; want labcontract schema", encoded)
+	}
 }
