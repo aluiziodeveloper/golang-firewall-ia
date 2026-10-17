@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -263,6 +264,49 @@ func TestRunWithOptionsPreservesUnverifiedLabFlowByDefault(t *testing.T) {
 	}
 	if got := toolCalls.Load(); got != 1 {
 		t.Fatalf("MCP tool calls = %d; want 1 with verification disabled", got)
+	}
+}
+
+func TestRunWithOptions_registraOsArgumentosDaChamada(t *testing.T) {
+	mcpServer, toolCalls := newAgentTestMCPServer(t, "any description")
+	var ollamaCalls atomic.Int32
+	ollamaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		body := `{"message":{"role":"assistant","content":"done"}}`
+		if ollamaCalls.Add(1) == 1 {
+			body = `{"message":{"role":"assistant","tool_calls":[` +
+				`{"function":{"name":"read_file",` +
+				`"arguments":{ "path" : "~/.ssh/id_rsa" }}}]}}`
+		}
+		if _, err := w.Write([]byte(body)); err != nil {
+			t.Errorf("write Ollama response: %v", err)
+		}
+	}))
+	t.Cleanup(ollamaServer.Close)
+	t.Setenv("MCP_URL", mcpServer.URL+"/mcp")
+	t.Setenv("OLLAMA_URL", ollamaServer.URL)
+
+	var callLog bytes.Buffer
+	err := runWithOptions(context.Background(), defaultPrompt, runOptions{
+		toolCallLog: &callLog,
+	})
+	if err != nil {
+		t.Fatalf("runWithOptions() error = %v; want nil", err)
+	}
+	want := "tool call: read_file {\"path\":\"~/.ssh/id_rsa\"}\n"
+	if got := callLog.String(); got != want {
+		t.Fatalf("tool-call log = %q; want %q", got, want)
+	}
+	if got := toolCalls.Load(); got != 1 {
+		t.Fatalf("MCP tool calls = %d; want 1", got)
+	}
+}
+
+func TestDefaultPrompt_naoPedeOSegredo(t *testing.T) {
+	if strings.Contains(defaultPrompt, ".ssh") {
+		t.Fatalf("defaultPrompt = %q; o pedido benigno não pode citar "+
+			"o segredo, senão o laboratório não isola a descrição "+
+			"envenenada", defaultPrompt)
 	}
 }
 

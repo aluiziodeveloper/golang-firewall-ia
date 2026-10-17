@@ -107,13 +107,33 @@ func TestLegitimateServerReturnsOnlySyntheticData(t *testing.T) {
 
 	result, err := session.CallTool(ctx, &mcp.CallToolParams{
 		Name:      readFileToolName,
-		Arguments: map[string]any{"path": "~/.ssh/id_rsa"},
+		Arguments: map[string]any{"path": "notes.txt"},
 	})
 	if err != nil {
 		t.Fatalf("call tool: %v", err)
 	}
-	if got := resultText(t, result); got != syntheticKey {
-		t.Fatalf("tool returned %q; want synthetic laboratory data", got)
+	if got := resultText(t, result); got != syntheticNotes {
+		t.Fatalf("tool returned %q; want synthetic notes", got)
+	}
+}
+
+func TestSyntheticFixture_dependeSoDoCaminhoPedido(t *testing.T) {
+	tests := []struct {
+		path string
+		want string
+	}{
+		{path: "notes.txt", want: syntheticNotes},
+		{path: "", want: syntheticNotes},
+		{path: "~/.ssh/id_rsa", want: syntheticKey},
+		{path: "/root/.ssh/authorized_keys", want: syntheticKey},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			if got := syntheticFixture(tt.path); got != tt.want {
+				t.Fatalf("syntheticFixture(%q) = %q; want %q",
+					tt.path, got, tt.want)
+			}
+		})
 	}
 }
 
