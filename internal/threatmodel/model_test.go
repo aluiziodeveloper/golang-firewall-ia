@@ -31,7 +31,8 @@ func TestModel_cobreTodasAsCategoriasSTRIDE(t *testing.T) {
 			covered[category] = true
 		}
 	}
-	for category := STRIDESpoofing; category <= STRIDEElevationOfPrivilege; category++ {
+	first, last := STRIDESpoofing, STRIDEElevationOfPrivilege
+	for category := first; category <= last; category++ {
 		if !covered[category] {
 			t.Errorf("nenhuma ameaça cobre %s", category)
 		}
