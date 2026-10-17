@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -46,9 +49,13 @@ func TestRun_repassaParaOServidor(t *testing.T) {
 
 // #endregion
 
-func TestRun_exigeOSeparador(t *testing.T) {
+func TestRun_recusaUsoInvalido(t *testing.T) {
 	for _, args := range [][]string{
-		nil, {"cat"}, {"--"}, {"-nope", "--", "cat"},
+		nil,
+		{"cat"},
+		{"--"},
+		{"-nope", "--", "cat"},
+		{"-upstream", "http://127.0.0.1:9000/mcp", "--", "cat"},
 	} {
 		err := run(context.Background(), args,
 			io.NopCloser(strings.NewReader("")),
@@ -113,3 +120,82 @@ func TestRun_negaOQueNaoFoiPermitido(t *testing.T) {
 }
 
 // #endregion
+
+// #region cmd-guarita-http-test
+// No modo HTTP, a Guarita escuta numa porta livre, repassa a chamada
+// permitida, nega a outra, recusa o Host estranho e encerra com ctx.
+func TestRun_servePorHTTP(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = io.WriteString(w, `{"jsonrpc":"2.0","result":{}}`)
+		}))
+	t.Cleanup(upstream.Close)
+	ctx, cancel := context.WithCancel(context.Background())
+	endpoint, done := startHTTP(t, ctx, "-allow", "read_file",
+		"-listen", "127.0.0.1:0", "-upstream", upstream.URL+"/mcp")
+
+	expect(t, endpoint, "", toolCall(1, "read_file"), 200, `"result"`)
+	expect(t, endpoint, "", toolCall(2, "delete_file"), 200, `"error"`)
+	expect(t, endpoint, "evil.test", toolCall(3, "read_file"), 403,
+		"host not allowed")
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("run() = %v; want context.Canceled", err)
+		}
+	case <-time.After(httpShutdownGrace):
+		t.Fatal("run() não terminou depois do cancelamento")
+	}
+}
+
+// #endregion
+
+// startHTTP roda a Guarita e devolve o endpoint que ela anuncia na
+// primeira linha da saída de erro.
+func startHTTP(
+	t *testing.T, ctx context.Context, args ...string,
+) (string, <-chan error) {
+	t.Helper()
+	stderrR, stderrW := io.Pipe()
+	done := make(chan error, 1)
+	go func() {
+		done <- run(ctx, args, io.NopCloser(strings.NewReader("")),
+			nopWriteCloser{&bytes.Buffer{}}, stderrW)
+		_ = stderrW.Close()
+	}()
+	line, err := bufio.NewReader(stderrR).ReadString('\n')
+	if err != nil {
+		t.Fatalf("a Guarita não anunciou o endereço: %v", err)
+	}
+	go func() { _, _ = io.Copy(io.Discard, stderrR) }()
+	return strings.TrimSpace(strings.TrimPrefix(line,
+		"guarita: escutando em ")), done
+}
+
+func toolCall(id int, tool string) string {
+	return fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call",`+
+		`"params":{"name":%q}}`, id, tool)
+}
+
+func expect(
+	t *testing.T, endpoint, host, body string, status int, contains string,
+) {
+	t.Helper()
+	r, _ := http.NewRequest("POST", endpoint, strings.NewReader(body))
+	if host != "" {
+		r.Host = host
+	}
+	response, err := http.DefaultClient.Do(r)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	got, _ := io.ReadAll(response.Body)
+	if response.StatusCode != status ||
+		!strings.Contains(string(got), contains) {
+		t.Fatalf("%s: %d %s; want %d com %q", body, response.StatusCode,
+			got, status, contains)
+	}
+}

@@ -4,16 +4,16 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"slices"
 	"strings"
 	"syscall"
+	"time"
 
+	"github.com/aluiziodeveloper/guarita/internal/adapters/mcphttp"
 	"github.com/aluiziodeveloper/guarita/internal/adapters/mcpproxy"
 	"github.com/aluiziodeveloper/guarita/internal/adapters/policystatic"
 	"github.com/aluiziodeveloper/guarita/internal/app"
@@ -21,7 +21,9 @@ import (
 )
 
 const usage = "uso: guarita [-allow ferramenta,…] -- " +
-	"<comando do servidor MCP> [argumentos]"
+	"<comando do servidor MCP> [argumentos]\n" +
+	"     guarita [-allow …] [-listen endereço] [-host …] [-origin …] " +
+	"-upstream <URL do servidor MCP>"
 
 var errUsage = errors.New(usage)
 
@@ -38,7 +40,7 @@ func main() {
 
 // #region cmd-guarita-run
 // run é a raiz de composição: lê a configuração, monta a política, o
-// caso de uso, a porta, o servidor e o repasse.
+// caso de uso e a porta, e escolhe o transporte.
 func run(
 	ctx context.Context,
 	args []string,
@@ -54,82 +56,74 @@ func run(
 	if err != nil {
 		return err
 	}
-	// O stdio só usa Authorize: o repasse fica com o Relay.
+	// Os dois transportes só usam Authorize: o repasse fica com eles.
 	gate := mcpproxy.NewGate(app.NewInterceptCall(policy, nil))
-	server, serverIO, err := startServer(ctx, config.command, stderr)
-	if err != nil {
-		return err
+	if config.upstream != "" {
+		return serveHTTP(ctx, config, gate, stderr)
 	}
-	agent := mcpproxy.Endpoint{Reader: stdin, Writer: stdout}
-	stats, relayErr := mcpproxy.Relay(ctx, agent, serverIO, gate)
-	waitErr := server.Wait() // só depois que o repasse leu tudo
-	report(stderr, stats)
-	return errors.Join(relayErr, waitErr)
+	return serveStdio(ctx, config.command, gate, stdin, stdout, stderr)
 }
 
 // #endregion
-
-// #region cmd-guarita-start-server
-// startServer inicia o servidor MCP como subprocesso e devolve as
-// pontas da entrada e da saída padrão dele.
-func startServer(
-	ctx context.Context, command []string, stderr io.Writer,
-) (*exec.Cmd, mcpproxy.Endpoint, error) {
-	// G204 avisa sobre comando vindo de fora. Aqui ele vem do operador,
-	// na linha de comando, nunca de uma mensagem do agente.
-	//nolint:gosec // o operador escolhe o servidor
-	server := exec.CommandContext(ctx, command[0], command[1:]...)
-	server.Stderr = stderr
-	var none mcpproxy.Endpoint
-	in, err := server.StdinPipe()
-	if err != nil {
-		return nil, none, fmt.Errorf("server stdin: %w", err)
-	}
-	out, err := server.StdoutPipe()
-	if err != nil {
-		return nil, none, fmt.Errorf("server stdout: %w", err)
-	}
-	if err := server.Start(); err != nil {
-		return nil, none, fmt.Errorf("start server: %w", err)
-	}
-	return server, mcpproxy.Endpoint{Reader: out, Writer: in}, nil
-}
-
-// #endregion
-
-func report(stderr io.Writer, stats mcpproxy.Stats) {
-	_, _ = fmt.Fprintf(stderr, "guarita: %d do agente, %d do servidor, "+
-		"%d recusadas\n", stats.AgentToServer, stats.ServerToAgent,
-		stats.Rejected)
-}
 
 type config struct {
-	decisions map[string]domain.Decision
-	command   []string
+	decisions   map[string]domain.Decision
+	command     []string // modo stdio
+	upstream    string   // modo HTTP
+	listen      string
+	hosts       []string
+	origins     []string
+	callTimeout time.Duration
 }
 
 // #region cmd-guarita-parse-config
-// parseConfig separa as opções da Guarita, antes de "--", do comando do
-// servidor, depois dele. Sem -allow, nenhuma ferramenta é permitida.
+// parseConfig lê as opções antes de "--" e o comando do servidor depois
+// dele. -upstream escolhe o modo HTTP; os dois modos juntos são erro.
 func parseConfig(args []string, stderr io.Writer) (config, error) {
-	separator := slices.Index(args, "--")
-	if separator < 0 || separator == len(args)-1 {
-		return config{}, errUsage
+	flagArgs, command := args, []string(nil)
+	if i := slices.Index(args, "--"); i >= 0 {
+		flagArgs, command = args[:i], args[i+1:]
 	}
 	flags := flag.NewFlagSet("guarita", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	allow := flags.String("allow", "",
-		"ferramentas permitidas, separadas por vírgula")
-	if err := flags.Parse(args[:separator]); err != nil {
+	allow := flags.String("allow", "", "ferramentas permitidas")
+	c := config{command: command}
+	flags.StringVar(&c.upstream, "upstream", "", "URL do servidor HTTP")
+	flags.StringVar(&c.listen, "listen", "127.0.0.1:8080", "escuta")
+	hosts := flags.String("host", "", "Host aceitos (padrão: loopback)")
+	origins := flags.String("origin", "", "origens aceitas")
+	flags.DurationVar(&c.callTimeout, "call-timeout",
+		mcphttp.DefaultCallTimeout, "prazo de cada chamada")
+	if err := flags.Parse(flagArgs); err != nil {
 		return config{}, errors.Join(errUsage, err)
 	}
-	decisions := make(map[string]domain.Decision)
-	for tool := range strings.SplitSeq(*allow, ",") {
-		if tool = strings.TrimSpace(tool); tool != "" {
-			decisions[tool] = domain.DecisionAllow
-		}
+	if flags.NArg() > 0 || (c.upstream == "") == (len(command) == 0) {
+		return config{}, errUsage
 	}
-	return config{decisions, args[separator+1:]}, nil
+	c.decisions = allowAll(list(*allow))
+	c.hosts, c.origins = list(*hosts), list(*origins)
+	return c, nil
 }
 
 // #endregion
+
+// allowAll permite as ferramentas listadas; as outras caem na falha
+// fechada de policystatic.
+func allowAll(tools []string) map[string]domain.Decision {
+	decisions := make(map[string]domain.Decision, len(tools))
+	for _, tool := range tools {
+		decisions[tool] = domain.DecisionAllow
+	}
+	return decisions
+}
+
+// list separa uma opção por vírgulas, sem itens vazios.
+func list(value string) []string {
+	var items []string
+	for item := range strings.SplitSeq(value, ",") {
+		if item = strings.TrimSpace(item); item != "" {
+			items = append(items, item)
+		}
+	}
+	return items
+}
