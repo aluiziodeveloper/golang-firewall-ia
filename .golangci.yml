@@ -16,12 +16,28 @@ linters:
     # #region lint-depguard
     depguard:
       rules:
+        # O domínio só usa a biblioteca padrão, e dela nada que faça I/O.
         domain:
+          list-mode: strict
           files:
             - "**/internal/domain/*.go"
+            - "!$test"
+          allow:
+            - $gostd
           deny:
-            - pkg: github.com/docker
-              desc: o domínio não depende de infraestrutura
+            - pkg: net
+              desc: o domínio não abre conexões
+            - pkg: os
+              desc: o domínio não toca o sistema
+        # Os casos de uso dependem do domínio, nunca de adaptadores.
+        app:
+          list-mode: strict
+          files:
+            - "**/internal/app/*.go"
+            - "!$test"
+          allow:
+            - $gostd
+            - github.com/aluiziodeveloper/guarita/internal/domain
     # #endregion
     exhaustive:
       # Um default não dispensa os casos: todo valor declarado precisa
