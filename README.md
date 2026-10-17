@@ -139,6 +139,8 @@ go test ./cmd/lab-agent
 
 O Capítulo 2 segue o mesmo esquema: `cap02-r1` é a referência do texto, `desafio/cap02` traz os testes do identificador de correlação e `cap02-desafio` guarda a solução.
 
+No Capítulo 3, a referência é `cap03`; `desafio/cap03` traz os testes da ameaça `audit-secret-leak` e `cap03-desafio`, a solução. O modelo de ameaças está em [`docs/threats/`](docs/threats/model.md).
+
 ## Uso seguro e escopo ético
 
 - Execute o cenário apenas no laboratório local deste repositório.
