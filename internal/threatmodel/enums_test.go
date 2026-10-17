@@ -1,11 +1,12 @@
-package domain
+package threatmodel
 
 import (
 	"errors"
+	"strings"
 	"testing"
 )
 
-// #region domain-trust-zone-test
+// #region threatmodel-trust-zone-test
 func TestTrustZone(t *testing.T) {
 	tests := []struct {
 		zone    TrustZone
@@ -154,7 +155,7 @@ func TestThreatStatus(t *testing.T) {
 	}
 }
 
-// #region domain-enum-validation-helper
+// #region threatmodel-enum-validation-helper
 func assertEnumValidation(
 	t *testing.T, err error, wantErr bool, kind error, field string,
 ) {
@@ -170,12 +171,8 @@ func assertEnumValidation(
 	if !errors.Is(err, kind) {
 		t.Fatalf("errors.Is(%v, %v) = false", err, kind)
 	}
-	var validationError *ValidationError
-	if !errors.As(err, &validationError) {
-		t.Fatalf("error type = %T; want *ValidationError", err)
-	}
-	if got := validationError.Field(); got != field {
-		t.Errorf("Field() = %q; want %q", got, field)
+	if !strings.HasPrefix(err.Error(), field+": ") {
+		t.Errorf("Error() = %q; want prefix %q", err, field+": ")
 	}
 }
 

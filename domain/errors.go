@@ -9,15 +9,6 @@ var (
 	ErrInvalidArguments = errors.New("arguments must be a JSON object")
 	// ErrInvalidDecision identifies a decision outside the supported set.
 	ErrInvalidDecision = errors.New("decision is not supported")
-	// ErrInvalidTrustZone identifies a zone outside the declared set.
-	ErrInvalidTrustZone = errors.New("trust zone is not supported")
-	// ErrInvalidTrustBoundary identifies a boundary without two valid,
-	// distinct zones.
-	ErrInvalidTrustBoundary = errors.New("trust boundary is not valid")
-	// ErrInvalidSTRIDECategory identifies a category outside STRIDE.
-	ErrInvalidSTRIDECategory = errors.New("STRIDE category not supported")
-	// ErrInvalidThreatStatus identifies a status outside the declared set.
-	ErrInvalidThreatStatus = errors.New("threat status is not supported")
 )
 
 // #region domain-validation-error

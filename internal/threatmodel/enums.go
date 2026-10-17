@@ -1,8 +1,13 @@
-package domain
+// Package threatmodel descreve o modelo de ameaças da Guarita como dados
+// testados. Ele documenta o projeto: nenhum caminho de chamada o usa.
+package threatmodel
 
-import "strconv"
+import (
+	"fmt"
+	"strconv"
+)
 
-// #region domain-trust-zone
+// #region threatmodel-trust-zone
 // TrustZone identifies a part of the system with one trust level.
 type TrustZone int
 
@@ -41,17 +46,14 @@ func (zone TrustZone) String() string {
 	}
 }
 
-// #region domain-trust-zone-validate
+// #region threatmodel-trust-zone-validate
 // Validate rejects the zero value and values outside the declared set.
 func (zone TrustZone) Validate() error {
 	if zone > TrustZoneUnspecified && zone <= TrustZoneStorage {
 		return nil
 	}
 
-	return &ValidationError{
-		field: "trust_zone",
-		kind:  ErrInvalidTrustZone,
-	}
+	return fmt.Errorf("trust_zone: %w", ErrInvalidTrustZone)
 }
 
 // #endregion
@@ -72,10 +74,7 @@ func (boundary TrustBoundary) Validate() error {
 	if boundary.From.Validate() != nil ||
 		boundary.To.Validate() != nil ||
 		boundary.From == boundary.To {
-		return &ValidationError{
-			field: "trust_boundary",
-			kind:  ErrInvalidTrustBoundary,
-		}
+		return fmt.Errorf("trust_boundary: %w", ErrInvalidTrustBoundary)
 	}
 
 	return nil
@@ -124,10 +123,7 @@ func (category STRIDECategory) Validate() error {
 		return nil
 	}
 
-	return &ValidationError{
-		field: "stride_category",
-		kind:  ErrInvalidSTRIDECategory,
-	}
+	return fmt.Errorf("stride_category: %w", ErrInvalidSTRIDECategory)
 }
 
 // ThreatStatus records how far the Guarita mitigates a threat.
@@ -166,8 +162,5 @@ func (status ThreatStatus) Validate() error {
 		return nil
 	}
 
-	return &ValidationError{
-		field: "threat_status",
-		kind:  ErrInvalidThreatStatus,
-	}
+	return fmt.Errorf("threat_status: %w", ErrInvalidThreatStatus)
 }
