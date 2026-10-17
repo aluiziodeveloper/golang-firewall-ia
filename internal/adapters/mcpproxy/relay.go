@@ -4,6 +4,7 @@ package mcpproxy
 
 import (
 	"bufio"
+	"bytes"
 	"cmp"
 	"context"
 	"errors"
@@ -13,10 +14,13 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// maxMessageBytes limita uma mensagem; o capítulo 6 trata o excesso.
+// maxMessageBytes limita uma mensagem; acima dele, ela é recusada.
 const maxMessageBytes = 4 << 20
 
 var errServerClosed = errors.New("server closed its output")
+
+// ErrMessageTooLarge recusa uma mensagem acima de maxMessageBytes.
+var ErrMessageTooLarge = errors.New("message too large")
 
 // Endpoint é um lado do repasse: de onde lê e para onde escreve.
 type Endpoint struct {
@@ -49,13 +53,14 @@ func Relay(
 	var stats Stats
 	group.Go(func() error {
 		keep := admit(groupCtx, gate, toAgent, &stats.Rejected)
-		n, err := pump(server.Writer, agent.Reader, keep)
+		n, err := pump(server.Writer, agent.Reader, keep,
+			replyTooLarge(toAgent, &stats.Rejected))
 		stats.AgentToServer = n
 		_ = server.Writer.Close() // o servidor recebe fim de entrada
 		return err
 	})
 	group.Go(func() error {
-		n, err := pump(toAgent, server.Reader, nil)
+		n, err := pump(toAgent, server.Reader, keepAll, dropTooLarge)
 		stats.ServerToAgent = n
 		return cmp.Or(err, errServerClosed)
 	})
@@ -77,10 +82,10 @@ func admit(
 	gate Admitter,
 	toAgent io.Writer,
 	rejected *int,
-) func([]byte) (bool, error) {
+) keepFunc {
 	return func(message []byte) (bool, error) {
 		if gate == nil {
-			return true, nil
+			return true, nil // repasse transparente
 		}
 		forward, reply := gate.Admit(ctx, message)
 		if forward {
@@ -96,6 +101,22 @@ func admit(
 }
 
 // #endregion
+
+func keepAll([]byte) (bool, error) { return true, nil }
+
+// dropTooLarge descarta uma resposta grande demais do servidor; o
+// agente espera e recebe o próprio erro de prazo.
+func dropTooLarge() error { return nil }
+
+// replyTooLarge conta a mensagem recusada e avisa o agente.
+func replyTooLarge(toAgent io.Writer, rejected *int) func() error {
+	return func() error {
+		*rejected++
+		_, err := toAgent.Write(errorReply(nil, codeInvalidRequest,
+			ErrMessageTooLarge.Error()))
+		return err
+	}
+}
 
 // #region mcpproxy-locked-writer
 // lockedWriter serializa as escritas: sem ele, a resposta da porta e a
@@ -132,34 +153,68 @@ func closeAll(endpoints ...Endpoint) {
 	}
 }
 
+// keepFunc decide se uma mensagem segue para o destino.
+type keepFunc func(message []byte) (bool, error)
+
+// pump copia mensagens uma por vez: se dst não lê, pump espera. A
+// mensagem acima do limite é descartada, e tooLarge é avisada.
+//
 // #region mcpproxy-pump
-// pump copia mensagens delimitadas por linha, uma por vez: se dst não
-// lê, pump espera, e nenhuma goroutine nova é criada. keep, se houver,
-// decide se cada mensagem segue.
 func pump(
-	dst io.Writer, src io.Reader, keep func([]byte) (bool, error),
+	dst io.Writer, src io.Reader, keep keepFunc, tooLarge func() error,
 ) (int, error) {
-	scanner := bufio.NewScanner(src)
-	scanner.Buffer(make([]byte, 64<<10), maxMessageBytes)
-	var message []byte
-	count := 0
-	for scanner.Scan() {
-		// Bytes aponta para o buffer do Scanner: copie antes de mexer.
-		message = append(message[:0], scanner.Bytes()...)
-		if keep != nil {
-			if ok, err := keep(message); !ok || err != nil {
-				if err != nil {
-					return count, err
-				}
-				continue
-			}
+	reader := bufio.NewReaderSize(src, 64<<10)
+	count, message := 0, []byte(nil)
+	for {
+		line, err := readMessage(reader, message)
+		if errors.Is(err, io.EOF) {
+			return count, nil
 		}
-		if _, err := dst.Write(append(message, '\n')); err != nil {
+		forward := false
+		switch {
+		case errors.Is(err, ErrMessageTooLarge):
+			err = tooLarge()
+		case err == nil:
+			message = line
+			forward, err = keep(message)
+		}
+		if err != nil {
 			return count, err
 		}
-		count++
+		if forward {
+			if _, err := dst.Write(append(message, '\n')); err != nil {
+				return count, err
+			}
+			count++
+		}
 	}
-	return count, scanner.Err()
+}
+
+// #endregion
+
+// #region mcpproxy-read-message
+// readMessage lê uma linha para buf. Uma linha maior que
+// maxMessageBytes é consumida até o fim e devolvida como
+// ErrMessageTooLarge, sem crescer a memória além do limite.
+func readMessage(reader *bufio.Reader, buf []byte) ([]byte, error) {
+	buf = buf[:0]
+	for {
+		chunk, err := reader.ReadSlice('\n')
+		if len(buf)+len(chunk) > maxMessageBytes+1 {
+			for errors.Is(err, bufio.ErrBufferFull) {
+				_, err = reader.ReadSlice('\n')
+			}
+			return nil, ErrMessageTooLarge
+		}
+		buf = append(buf, chunk...)
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue // a linha continua no próximo pedaço
+		}
+		if err != nil && (len(buf) == 0 || !errors.Is(err, io.EOF)) {
+			return nil, err
+		}
+		return bytes.TrimRight(buf, "\r\n"), nil
+	}
 }
 
 // #endregion
