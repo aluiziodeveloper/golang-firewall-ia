@@ -52,3 +52,4 @@ A raiz é um nó **E**: basta cortar um dos quatro ramos para o ataque falhar. P
 | `resource-abuse` | Esgotar cota ou fatura | laço de chamadas E ausência de limite | cota por agente e ferramenta (Cap. 18) |
 | `insecure-parsing` | Derrubar ou enganar o *parser* | mensagem grande OU ambígua OU malformada | limites e *fuzzing* (Cap. 6) |
 | `approval-forgery` | Obter aprovação sem decisão humana real | aprovação forjada OU fadiga | máquina de estados e limites (Cap. 12) |
+| `dns-rebinding` | Chamar ferramentas pelo navegador do usuário | nome do atacante resolvido para 127.0.0.1 E endpoint que aceita qualquer `Host` | lista de `Host` e de `Origin`, escuta em loopback (Cap. 7); autenticação (Cap. 8) |

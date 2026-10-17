@@ -16,8 +16,8 @@ func TestModel_cadaAmeacaEValidaEUnica(t *testing.T) {
 		}
 		seen[threat.ID] = true
 	}
-	if got := len(seen); got != 12 {
-		t.Errorf("modelo v1 tem %d ameaças; want 12", got)
+	if got := len(seen); got != 13 {
+		t.Errorf("o modelo tem %d ameaças; want 13", got)
 	}
 }
 
