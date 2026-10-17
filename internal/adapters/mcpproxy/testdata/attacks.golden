@@ -1,0 +1,7 @@
+1: erro: data after the JSON-RPC message
+2: erro: duplicate key in JSON object: "name"
+3: erro: JSON-RPC batches are not supported
+4: erro: data after the JSON-RPC message
+5: erro: jsonrpc must be "2.0"
+6: erro: not a request, notification or response
+7: erro: message is not valid JSON: unexpected EOF
