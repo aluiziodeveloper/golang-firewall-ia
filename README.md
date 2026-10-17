@@ -152,7 +152,7 @@ A Guarita segue a arquitetura hexagonal decidida nos ADRs [0001](docs/adr/0001-p
 | `internal/domain` | `Call`, `Tool`, `Decision`, `Result` e suas validações | Só a biblioteca padrão, sem `net` nem `os` |
 | `internal/app` | Caso de uso `InterceptCall` e as portas `PolicyEvaluator` e `Upstream` | Biblioteca padrão e `internal/domain` |
 | `internal/adapters/...` | Implementações das portas, como `policystatic` | `internal/app`, `internal/domain` e o que a tecnologia exigir |
-| `cmd/guarita` | Raiz de composição: escolhe os adaptadores e monta os casos de uso | Tudo |
+| `cmd/guarita` | Raiz de composição a partir do Capítulo 5: escolherá os adaptadores e montará os casos de uso | Tudo |
 
 As duas primeiras linhas são verificadas pelo `depguard` no `golangci-lint`; um import fora da lista quebra a CI.
 
