@@ -91,6 +91,9 @@ func Model() []Threat {
 		threat("approval-forgery",
 			"Aprovação forjada ou obtida por fadiga",
 			edge(operator, out), 12, spoofing, repudiation),
+		threat("audit-secret-leak",
+			"Segredos gravados na trilha de auditoria",
+			edge(out, TrustZoneStorage), 19, informationDisclosure),
 	}
 }
 

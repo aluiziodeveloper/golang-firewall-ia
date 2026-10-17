@@ -1,6 +1,6 @@
 # Modelo de ameaças da Guarita — v1
 
-- **Versão:** v1, Capítulo 3 do livro (*tag* `cap03`).
+- **Versão:** v1 com a ameaça do desafio do Capítulo 3 (*tag* `cap03-desafio`).
 - **Método:** zonas e fronteiras de confiança, STRIDE por ameaça e árvores de ataque em [`trees.md`](trees.md).
 - **Fonte de verdade:** a tabela de ameaças deste arquivo e a função `threatmodel.Model()` precisam coincidir; o teste `TestModelo_coincideComODocumento` quebra a CI quando divergem.
 
@@ -46,6 +46,7 @@ Uma fronteira é escrita `origem->destino`, como `TrustBoundary.String()`.
 | `mcp-server->guarita` | Definições de ferramentas e respostas das chamadas |
 | `operator->guarita` | Aprovações de chamadas pausadas |
 | `operator->mcp-server` | Instalação e atualização de servidores |
+| `guarita->storage` | Catálogo, políticas e entradas da trilha de auditoria |
 
 ## Ameaças
 
@@ -65,6 +66,7 @@ Estado `open` significa que a Guarita ainda não tem a defesa. A conferência op
 | `resource-abuse` | Laços de chamadas que esgotam cota ou custo | denial-of-service | agent->guarita | 18 | open |
 | `insecure-parsing` | Mensagem malformada ou ambígua no protocolo | tampering, denial-of-service | agent->guarita | 6 | open |
 | `approval-forgery` | Aprovação forjada ou obtida por fadiga | spoofing, repudiation | operator->guarita | 12 | open |
+| `audit-secret-leak` | Segredos gravados na trilha de auditoria | information-disclosure | guarita->storage | 19 | open |
 
 ## A cena do Capítulo 3: o *confused deputy*
 

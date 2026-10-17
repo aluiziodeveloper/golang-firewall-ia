@@ -51,4 +51,5 @@ A raiz é um nó **E**: basta cortar um dos quatro ramos para o ataque falhar. P
 | `supply-chain` | Rodar código novo sob uma versão aprovada | pacote atualizado sem verificação | versão fixa e assinatura (Cap. 20) |
 | `resource-abuse` | Esgotar cota ou fatura | laço de chamadas E ausência de limite | cota por agente e ferramenta (Cap. 18) |
 | `insecure-parsing` | Derrubar ou enganar o *parser* | mensagem grande OU ambígua OU malformada | limites e *fuzzing* (Cap. 6) |
+| `audit-secret-leak` | Ler segredos na trilha de auditoria | segredo nos argumentos E argumento gravado sem redação | redação antes de gravar (Cap. 19) |
 | `approval-forgery` | Obter aprovação sem decisão humana real | aprovação forjada OU fadiga | máquina de estados e limites (Cap. 12) |
