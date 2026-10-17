@@ -16,8 +16,8 @@ func TestModel_cadaAmeacaEValidaEUnica(t *testing.T) {
 		}
 		seen[threat.ID] = true
 	}
-	if got := len(seen); got != 12 {
-		t.Errorf("modelo v1 tem %d ameaças; want 12", got)
+	if got := len(seen); got != 13 {
+		t.Errorf("modelo tem %d ameaças; want 13", got)
 	}
 }
 
@@ -91,4 +91,32 @@ func TestThreatValidate_recusaAmeacaIncompleta(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Desafio do capítulo 3: a trilha de auditoria pode guardar segredos
+// que passaram pelos argumentos.
+func TestModel_incluiVazamentoNaTrilha(t *testing.T) {
+	want := TrustBoundary{From: TrustZoneGuarita, To: TrustZoneStorage}
+	for _, threat := range Model() {
+		if threat.ID != "audit-secret-leak" {
+			continue
+		}
+		if len(threat.Categories) != 1 ||
+			threat.Categories[0] != STRIDEInformationDisclosure {
+			t.Errorf("Categories = %v; want information-disclosure",
+				threat.Categories)
+		}
+		if threat.Boundary != want {
+			t.Errorf("Boundary = %s; want %s", threat.Boundary, want)
+		}
+		if threat.DefenseChapter != 19 {
+			t.Errorf("DefenseChapter = %d; want 19",
+				threat.DefenseChapter)
+		}
+		if threat.Status != ThreatStatusOpen {
+			t.Errorf("Status = %s; want open", threat.Status)
+		}
+		return
+	}
+	t.Fatal("Model() não tem a ameaça audit-secret-leak")
 }
