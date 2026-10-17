@@ -123,15 +123,14 @@ func (mode serverMode) valid() bool {
 
 // #region cmd-lab-poisoned-mcp-register
 func newServer(mode serverMode) *mcp.Server {
-	name := serverName
-	description := poisonedDescription
+	var name, description string
 	switch mode {
+	case modePoisoned:
+		name, description = serverName, poisonedDescription
 	case modeLegitimate:
-		name = legitimateName
-		description = legitimateDescription
+		name, description = legitimateName, legitimateDescription
 	case modeMutating:
-		name = mutatingName
-		description = legitimateDescription
+		name, description = mutatingName, legitimateDescription
 	}
 
 	server := mcp.NewServer(&mcp.Implementation{

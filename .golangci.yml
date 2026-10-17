@@ -2,13 +2,21 @@ version: "2"
 
 linters:
   default: none
+  # #region lint-exhaustive
   enable:
     - errcheck
+    - exhaustive
     - gosec
     - govet
     - ineffassign
     - staticcheck
     - unused
+  settings:
+    exhaustive:
+      # Um default não dispensa os casos: todo valor declarado precisa
+      # aparecer no switch.
+      default-signifies-exhaustive: false
+  # #endregion
 
 formatters:
   enable:
