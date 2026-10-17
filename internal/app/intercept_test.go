@@ -60,7 +60,7 @@ func TestInterceptCall_repassaSoComAllow(t *testing.T) {
 			"aprovação pausa", domain.DecisionRequireApproval, nil,
 			ErrApprovalRequired, 0,
 		},
-		{"decisão desconhecida nega", "execute", nil, ErrPolicyFailed, 0},
+		{"desconhecida nega", "execute", nil, ErrPolicyFailed, 0},
 		{"decisão vazia nega", "", nil, ErrPolicyFailed, 0},
 		{"erro da política nega", "", errBoom, ErrPolicyFailed, 0},
 	}
