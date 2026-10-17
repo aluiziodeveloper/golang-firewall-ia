@@ -33,6 +33,7 @@ type Stats struct {
 	AgentToServer int
 	ServerToAgent int
 	Rejected      int
+	Dropped       int
 }
 
 // Admitter decide, mensagem a mensagem, o que segue do agente para o
@@ -60,7 +61,11 @@ func Relay(
 		return err
 	})
 	group.Go(func() error {
-		n, err := pump(toAgent, server.Reader, keepAll, dropTooLarge)
+		keep := keepAll
+		if gate != nil { // com porta, o servidor também passa pelo parser
+			keep = keepValid(&stats.Dropped)
+		}
+		n, err := pump(toAgent, server.Reader, keep, dropTooLarge)
 		stats.ServerToAgent = n
 		return cmp.Or(err, errServerClosed)
 	})
@@ -103,6 +108,17 @@ func admit(
 // #endregion
 
 func keepAll([]byte) (bool, error) { return true, nil }
+
+// keepValid descarta a mensagem do servidor que o parser recusa.
+func keepValid(dropped *int) keepFunc {
+	return func(message []byte) (bool, error) {
+		if _, err := ParseMessage(message); err != nil {
+			*dropped++
+			return false, nil
+		}
+		return true, nil
+	}
+}
 
 // dropTooLarge descarta uma resposta grande demais do servidor; o
 // agente espera e recebe o próprio erro de prazo.
