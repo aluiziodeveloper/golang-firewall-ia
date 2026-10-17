@@ -3,18 +3,25 @@ package main
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"os/exec"
 	"os/signal"
+	"slices"
+	"strings"
 	"syscall"
 
 	"github.com/aluiziodeveloper/guarita/internal/adapters/mcpproxy"
+	"github.com/aluiziodeveloper/guarita/internal/adapters/policystatic"
+	"github.com/aluiziodeveloper/guarita/internal/app"
+	"github.com/aluiziodeveloper/guarita/internal/domain"
 )
 
-const usage = "uso: guarita -- <comando do servidor MCP> [argumentos]"
+const usage = "uso: guarita [-allow ferramenta,…] -- " +
+	"<comando do servidor MCP> [argumentos]"
 
 var errUsage = errors.New(usage)
 
@@ -30,8 +37,8 @@ func main() {
 }
 
 // #region cmd-guarita-run
-// run é a raiz de composição: monta o servidor e o repasse. As
-// entradas e saídas chegam por parâmetro, para o teste trocá-las.
+// run é a raiz de composição: lê a configuração, monta a política, o
+// caso de uso, a porta, o servidor e o repasse.
 func run(
 	ctx context.Context,
 	args []string,
@@ -39,19 +46,24 @@ func run(
 	stdout io.WriteCloser,
 	stderr io.Writer,
 ) error {
-	command, err := serverCommand(args)
+	config, err := parseConfig(args, stderr)
 	if err != nil {
 		return err
 	}
-	server, serverIO, err := startServer(ctx, command, stderr)
+	policy, err := policystatic.New(config.decisions)
+	if err != nil {
+		return err
+	}
+	// O stdio só usa Authorize: o repasse fica com o Relay.
+	gate := mcpproxy.NewGate(app.NewInterceptCall(policy, nil))
+	server, serverIO, err := startServer(ctx, config.command, stderr)
 	if err != nil {
 		return err
 	}
 	agent := mcpproxy.Endpoint{Reader: stdin, Writer: stdout}
-	stats, relayErr := mcpproxy.Relay(ctx, agent, serverIO, nil)
+	stats, relayErr := mcpproxy.Relay(ctx, agent, serverIO, gate)
 	waitErr := server.Wait() // só depois que o repasse leu tudo
-	_, _ = fmt.Fprintf(stderr, "guarita: %d mensagens do agente, "+
-		"%d do servidor\n", stats.AgentToServer, stats.ServerToAgent)
+	report(stderr, stats)
 	return errors.Join(relayErr, waitErr)
 }
 
@@ -85,11 +97,39 @@ func startServer(
 
 // #endregion
 
-// serverCommand exige "--" antes do comando, para que opções futuras da
-// Guarita não se confundam com as do servidor.
-func serverCommand(args []string) ([]string, error) {
-	if len(args) < 2 || args[0] != "--" {
-		return nil, errUsage
-	}
-	return args[1:], nil
+func report(stderr io.Writer, stats mcpproxy.Stats) {
+	_, _ = fmt.Fprintf(stderr, "guarita: %d do agente, %d do servidor, "+
+		"%d recusadas\n", stats.AgentToServer, stats.ServerToAgent,
+		stats.Rejected)
 }
+
+type config struct {
+	decisions map[string]domain.Decision
+	command   []string
+}
+
+// #region cmd-guarita-parse-config
+// parseConfig separa as opções da Guarita, antes de "--", do comando do
+// servidor, depois dele. Sem -allow, nenhuma ferramenta é permitida.
+func parseConfig(args []string, stderr io.Writer) (config, error) {
+	separator := slices.Index(args, "--")
+	if separator < 0 || separator == len(args)-1 {
+		return config{}, errUsage
+	}
+	flags := flag.NewFlagSet("guarita", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	allow := flags.String("allow", "",
+		"ferramentas permitidas, separadas por vírgula")
+	if err := flags.Parse(args[:separator]); err != nil {
+		return config{}, errors.Join(errUsage, err)
+	}
+	decisions := make(map[string]domain.Decision)
+	for tool := range strings.SplitSeq(*allow, ",") {
+		if tool = strings.TrimSpace(tool); tool != "" {
+			decisions[tool] = domain.DecisionAllow
+		}
+	}
+	return config{decisions, args[separator+1:]}, nil
+}
+
+// #endregion
