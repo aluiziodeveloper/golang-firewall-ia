@@ -49,3 +49,15 @@ jobs:
         with:
           version: v2.14.0
       # #endregion
+
+  lab-image:
+    name: Lab image build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      # O laboratório só é reproduzível se a imagem compilar; os testes
+      # Go não exercitam o contexto de build do Dockerfile.
+      - name: Build laboratory image
+        run: docker build -f deploy/Dockerfile -t guarita-lab:ci .
