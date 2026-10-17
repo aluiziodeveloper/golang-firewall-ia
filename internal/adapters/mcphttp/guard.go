@@ -40,13 +40,11 @@ func NewGuard(hosts, origins []string) (*Guard, error) {
 		return nil, ErrNoHosts
 	}
 	for _, origin := range origins {
-		u, err := url.Parse(origin)
-		if err != nil || (u.Scheme != "http" && u.Scheme != "https") ||
-			u.Host == "" || u.User != nil || u.Path != "" ||
-			u.RawQuery != "" || u.Fragment != "" {
+		normal, ok := normalizeOrigin(origin)
+		if !ok {
 			return nil, fmt.Errorf("%w: %q", ErrOriginConfig, origin)
 		}
-		guard.origins[u.Scheme+"://"+strings.ToLower(u.Host)] = true
+		guard.origins[normal] = true
 	}
 	return guard, nil
 }
@@ -62,7 +60,8 @@ func (g *Guard) Check(r *http.Request) error {
 		return fmt.Errorf("%w: %q", ErrHost, r.Host)
 	}
 	origin := r.Header.Get("Origin")
-	if origin != "" && !g.origins[origin] {
+	if normal, ok := normalizeOrigin(origin); origin != "" &&
+		(!ok || !g.origins[normal]) {
 		return fmt.Errorf("%w: %q", ErrOrigin, origin)
 	}
 	return nil
@@ -115,3 +114,27 @@ func LoopbackHosts(addr string) ([]string, error) {
 }
 
 // #endregion
+
+var defaultPorts = map[string]string{"http": "80", "https": "443"}
+
+// normalizeOrigin escreve a origem na forma canônica: esquema e nome em
+// minúsculas, sem a porta padrão. Recusa o que não for esquema://host.
+func normalizeOrigin(origin string) (string, bool) {
+	u, err := url.Parse(origin)
+	if err != nil || u.User != nil || u.Path != "" || u.Opaque != "" ||
+		u.RawQuery != "" || u.Fragment != "" || u.ForceQuery {
+		return "", false
+	}
+	scheme := strings.ToLower(u.Scheme)
+	if _, ok := defaultPorts[scheme]; !ok || u.Hostname() == "" {
+		return "", false
+	}
+	host := strings.ToLower(u.Hostname())
+	if strings.Contains(host, ":") {
+		host = "[" + host + "]" // IPv6 volta entre colchetes
+	}
+	if port := u.Port(); port != "" && port != defaultPorts[scheme] {
+		host += ":" + port
+	}
+	return scheme + "://" + host, true
+}
