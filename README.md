@@ -145,6 +145,8 @@ No Capítulo 4, a referência é `cap04`; `desafio/cap04` traz os testes da port
 
 No Capítulo 5, a referência é `cap05`; `desafio/cap05` traz os testes do encerramento com prazo e `cap05-desafio`, a solução.
 
+No Capítulo 6, a referência é `cap06`; `desafio/cap06` traz os testes da inspeção das respostas do servidor e `cap06-desafio`, a solução.
+
 ## Proxy stdio
 
 A partir do Capítulo 5, a Guarita fica entre o agente e um servidor MCP que fala pelo transporte stdio. Configure o agente para executar a Guarita no lugar do servidor, com o comando do servidor depois de `--`:
@@ -154,7 +156,15 @@ go build -o guarita ./cmd/guarita
 ./guarita -- <comando do servidor MCP> [argumentos]
 ```
 
-A Guarita inicia o servidor como subprocesso, repassa as mensagens nos dois sentidos e termina quando o servidor fecha a saída ou quando recebe SIGINT ou SIGTERM. Neste capítulo, o repasse ainda é transparente; a interpretação das mensagens e as decisões de política entram no Capítulo 6.
+A Guarita inicia o servidor como subprocesso, repassa as mensagens nos dois sentidos e termina quando o servidor fecha a saída ou quando recebe SIGINT ou SIGTERM.
+
+Desde o Capítulo 6, cada mensagem do agente passa por um parser estrito: uma mensagem JSON-RPC 2.0 por linha, sem dados depois dela, sem chave repetida, sem lote e com no máximo 4 MiB. Cada `tools/call` passa pela política antes de chegar ao servidor. A política estática permite só as ferramentas listadas em `-allow`; sem a opção, nenhuma ferramenta é permitida:
+
+```bash
+./guarita -allow read_file,list_dir -- <comando do servidor MCP>
+```
+
+O que for negado ou malformado volta ao agente como erro JSON-RPC e não chega ao servidor.
 
 ## Arquitetura e regra de imports
 
