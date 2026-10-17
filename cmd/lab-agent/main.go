@@ -131,7 +131,6 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 		}
 	}()
 
-	// #region cmd-lab-agent-discovery
 	listed, err := session.ListTools(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("list MCP tools: %w", err)
@@ -139,6 +138,7 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 	if len(listed.Tools) == 0 {
 		return errors.New("MCP laboratory server advertised no tools")
 	}
+	// #region cmd-lab-agent-discovery
 	if options.verifyToolDescriptions {
 		if err := validateToolDescriptions(listed.Tools); err != nil {
 			return err
@@ -171,6 +171,7 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 		http:    &http.Client{Timeout: 4 * time.Minute},
 	}
 	messages := []ollamaMessage{{Role: "user", Content: prompt}}
+	callLog := options.toolCallLog
 
 	for turn := 0; turn <= maxToolCallingTurns; turn++ {
 		response, err := ollama.chat(ctx, messages, tools)
@@ -203,8 +204,7 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 					"decode arguments for MCP tool %q: %w", name, err,
 				)
 			}
-			err = logToolCall(options.toolCallLog, call.Function)
-			if err != nil {
+			if err := logToolCall(callLog, call.Function); err != nil {
 				return err
 			}
 			result, err := session.CallTool(ctx, &mcp.CallToolParams{
