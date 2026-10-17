@@ -4,6 +4,7 @@ linters:
   default: none
   # #region lint-exhaustive
   enable:
+    - depguard
     - errcheck
     - exhaustive
     - gosec
@@ -12,6 +13,16 @@ linters:
     - staticcheck
     - unused
   settings:
+    # #region lint-depguard
+    depguard:
+      rules:
+        domain:
+          files:
+            - "**/internal/domain/*.go"
+          deny:
+            - pkg: github.com/docker
+              desc: o domínio não depende de infraestrutura
+    # #endregion
     exhaustive:
       # Um default não dispensa os casos: todo valor declarado precisa
       # aparecer no switch.
