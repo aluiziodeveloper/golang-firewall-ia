@@ -137,6 +137,8 @@ git switch -c meu-desafio-cap01 desafio/cap01
 go test ./cmd/lab-agent
 ```
 
+O Capítulo 2 segue o mesmo esquema: `cap02-r1` é a referência do texto, `desafio/cap02` traz os testes do identificador de correlação e `cap02-desafio` guarda a solução.
+
 ## Uso seguro e escopo ético
 
 - Execute o cenário apenas no laboratório local deste repositório.
