@@ -21,6 +21,9 @@ var (
 )
 
 // #region domain-validation-error
+// O compilador confere aqui que *ValidationError satisfaz error.
+var _ error = (*ValidationError)(nil)
+
 // ValidationError identifies the field that failed domain validation.
 type ValidationError struct {
 	field string
