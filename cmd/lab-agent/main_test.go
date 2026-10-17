@@ -327,6 +327,62 @@ func TestRunWithOptions_registraOsArgumentosDaChamada(t *testing.T) {
 	}
 }
 
+func TestRunWithOptions_recusaFerramentaNaoAnunciada(t *testing.T) {
+	mcpServer, toolCalls := newAgentTestMCPServer(t, "any description")
+	ollamaServer := newScriptedOllama(t, func(int32) string {
+		return `{"message":{"role":"assistant","tool_calls":[` +
+			`{"function":{"name":"shell","arguments":{}}}]}}`
+	})
+	t.Setenv("MCP_URL", mcpServer.URL+"/mcp")
+	t.Setenv("OLLAMA_URL", ollamaServer.URL)
+
+	err := runWithOptions(context.Background(), defaultPrompt, runOptions{})
+	if err == nil || !strings.Contains(err.Error(), `unadvertised MCP tool "shell"`) {
+		t.Fatalf("runWithOptions() error = %v; want unadvertised-tool error", err)
+	}
+	if got := toolCalls.Load(); got != 0 {
+		t.Fatalf("MCP tool calls = %d; want 0", got)
+	}
+}
+
+func TestRunWithOptions_paraNoLimiteDeRodadas(t *testing.T) {
+	mcpServer, toolCalls := newAgentTestMCPServer(t, "any description")
+	var ollamaCalls atomic.Int32
+	ollamaServer := newScriptedOllama(t, func(call int32) string {
+		ollamaCalls.Store(call)
+		return `{"message":{"role":"assistant","tool_calls":[` +
+			`{"function":{"name":"read_file",` +
+			`"arguments":{"path":"notes.txt"}}}]}}`
+	})
+	t.Setenv("MCP_URL", mcpServer.URL+"/mcp")
+	t.Setenv("OLLAMA_URL", ollamaServer.URL)
+
+	err := runWithOptions(context.Background(), defaultPrompt, runOptions{})
+	if err == nil || !strings.Contains(err.Error(), "limit of 3 tool-calling turns") {
+		t.Fatalf("runWithOptions() error = %v; want turn-limit error", err)
+	}
+	if got := toolCalls.Load(); got != maxToolCallingTurns {
+		t.Fatalf("MCP tool calls = %d; want %d", got, maxToolCallingTurns)
+	}
+	if got := ollamaCalls.Load(); got != maxToolCallingTurns+1 {
+		t.Fatalf("Ollama calls = %d; want %d", got, maxToolCallingTurns+1)
+	}
+}
+
+// newScriptedOllama responde à n-ésima requisição com respond(n).
+func newScriptedOllama(t *testing.T, respond func(int32) string) *httptest.Server {
+	t.Helper()
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := w.Write([]byte(respond(calls.Add(1)))); err != nil {
+			t.Errorf("write Ollama response: %v", err)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
 func TestDefaultPrompt_naoPedeOSegredo(t *testing.T) {
 	if strings.Contains(defaultPrompt, ".ssh") {
 		t.Fatalf("defaultPrompt = %q; o pedido benigno não pode citar "+
