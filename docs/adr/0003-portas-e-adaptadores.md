@@ -13,7 +13,7 @@ A Guarita também precisava do ponto que o Capítulo 2 deixou pendente: o lugar 
 ## Decisão
 
 1. O caso de uso `InterceptCall`, em `internal/app`, valida a chamada, consulta a política e só repassa ao servidor com `DecisionAllow` validado. Erro da política e decisão desconhecida negam a chamada.
-2. As portas `PolicyEvaluator` e `Upstream` são declaradas em `internal/app`, onde são consumidas; os adaptadores as implementam e serão escolhidos em `cmd/guarita`, a raiz de composição, quando o proxy existir (Capítulo 5).
+2. As portas `PolicyEvaluator` e `Upstream` são declaradas em `internal/app`, onde são consumidas; os adaptadores as implementam e são escolhidos em `cmd/guarita`, a raiz de composição, que o Capítulo 5 passa a usar.
 3. O domínio fica em `internal/domain`.
 4. O `depguard` usa lista de permissão: `internal/domain` só importa a biblioteca padrão, sem `net` nem `os`; `internal/app` só importa a biblioteca padrão e o domínio. Os arquivos de teste ficam fora das regras.
 

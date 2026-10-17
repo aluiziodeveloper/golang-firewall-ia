@@ -143,6 +143,19 @@ No Capítulo 3, a referência é `cap03`; `desafio/cap03` traz os testes da amea
 
 No Capítulo 4, a referência é `cap04`; `desafio/cap04` traz os testes da porta `AuditRecorder` e `cap04-desafio`, a solução.
 
+No Capítulo 5, a referência é `cap05`; `desafio/cap05` traz os testes do encerramento com prazo e `cap05-desafio`, a solução.
+
+## Proxy stdio
+
+A partir do Capítulo 5, a Guarita fica entre o agente e um servidor MCP que fala pelo transporte stdio. Configure o agente para executar a Guarita no lugar do servidor, com o comando do servidor depois de `--`:
+
+```bash
+go build -o guarita ./cmd/guarita
+./guarita -- <comando do servidor MCP> [argumentos]
+```
+
+A Guarita inicia o servidor como subprocesso, repassa as mensagens nos dois sentidos e termina quando o servidor fecha a saída ou quando recebe SIGINT ou SIGTERM. Neste capítulo, o repasse ainda é transparente; a interpretação das mensagens e as decisões de política entram no Capítulo 6.
+
 ## Arquitetura e regra de imports
 
 A Guarita segue a arquitetura hexagonal decidida nos ADRs [0001](docs/adr/0001-proxy-mcp.md) e [0003](docs/adr/0003-portas-e-adaptadores.md):
@@ -151,8 +164,8 @@ A Guarita segue a arquitetura hexagonal decidida nos ADRs [0001](docs/adr/0001-p
 |---|---|---|
 | `internal/domain` | `Call`, `Tool`, `Decision`, `Result` e suas validações | Só a biblioteca padrão, sem `net` nem `os` |
 | `internal/app` | Caso de uso `InterceptCall` e as portas `PolicyEvaluator` e `Upstream` | Biblioteca padrão e `internal/domain` |
-| `internal/adapters/...` | Implementações das portas, como `policystatic` | `internal/app`, `internal/domain` e o que a tecnologia exigir |
-| `cmd/guarita` | Raiz de composição a partir do Capítulo 5: escolherá os adaptadores e montará os casos de uso | Tudo |
+| `internal/adapters/...` | Implementações das portas e adaptadores de entrada, como `policystatic` e `mcpproxy` | `internal/app`, `internal/domain` e o que a tecnologia exigir |
+| `cmd/guarita` | Raiz de composição: inicia o servidor e monta o repasse | Tudo |
 
 As duas primeiras linhas são verificadas pelo `depguard` no `golangci-lint`; um import fora da lista quebra a CI.
 
