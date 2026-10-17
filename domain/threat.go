@@ -48,7 +48,10 @@ func (zone TrustZone) Validate() error {
 		return nil
 	}
 
-	return &ValidationError{field: "trust_zone", kind: ErrInvalidTrustZone}
+	return &ValidationError{
+		field: "trust_zone",
+		kind:  ErrInvalidTrustZone,
+	}
 }
 
 // #endregion

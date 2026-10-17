@@ -140,7 +140,8 @@ func TestCallValidate(t *testing.T) {
 			}
 
 			if !errors.Is(err, test.wantKind) {
-				t.Errorf("errors.Is(%v, %v) = false", err, test.wantKind)
+				t.Errorf("errors.Is(%v, %v) = false",
+					err, test.wantKind)
 			}
 
 			raw := string(test.call.Arguments)

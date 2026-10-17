@@ -24,8 +24,8 @@ func TestValidateReproducesScene(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			if err := Validate(test.call, test.result); err != nil {
-				t.Fatalf("Validate() = %v; the scene accepts this input",
-					err)
+				t.Fatalf("Validate() = %v; "+
+					"the scene accepts this input", err)
 			}
 		})
 	}

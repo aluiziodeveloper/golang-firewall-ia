@@ -12,14 +12,20 @@ func TestTrustZone(t *testing.T) {
 		want    string
 		wantErr bool
 	}{
-		{zone: TrustZoneUnspecified, want: "unspecified", wantErr: true},
+		{
+			zone: TrustZoneUnspecified, want: "unspecified",
+			wantErr: true,
+		},
 		{zone: TrustZoneAgent, want: "agent"},
 		{zone: TrustZoneGuarita, want: "guarita"},
 		{zone: TrustZoneMCPServer, want: "mcp-server"},
 		{zone: TrustZoneOperator, want: "operator"},
 		{zone: TrustZoneLocalModel, want: "local-model"},
 		{zone: TrustZoneStorage, want: "storage"},
-		{zone: TrustZoneStorage + 1, want: "TrustZone(7)", wantErr: true},
+		{
+			zone: TrustZoneStorage + 1, want: "TrustZone(7)",
+			wantErr: true,
+		},
 		{zone: -1, want: "TrustZone(-1)", wantErr: true},
 	}
 

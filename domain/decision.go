@@ -7,7 +7,10 @@ func (decision Decision) Validate() error {
 	case DecisionAllow, DecisionDeny, DecisionRequireApproval:
 		return nil
 	default:
-		return &ValidationError{field: "decision", kind: ErrInvalidDecision}
+		return &ValidationError{
+			field: "decision",
+			kind:  ErrInvalidDecision,
+		}
 	}
 }
 
