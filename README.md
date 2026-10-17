@@ -141,6 +141,21 @@ O Capítulo 2 segue o mesmo esquema: `cap02-r1` é a referência do texto, `desa
 
 No Capítulo 3, a referência é `cap03`; `desafio/cap03` traz os testes da ameaça `audit-secret-leak` e `cap03-desafio`, a solução. O modelo de ameaças está em [`docs/threats/`](docs/threats/model.md).
 
+No Capítulo 4, a referência é `cap04`; `desafio/cap04` traz os testes da porta `AuditRecorder` e `cap04-desafio`, a solução.
+
+## Arquitetura e regra de imports
+
+A Guarita segue a arquitetura hexagonal decidida nos ADRs [0001](docs/adr/0001-proxy-mcp.md) e [0003](docs/adr/0003-portas-e-adaptadores.md):
+
+| Pacote | Papel | Pode importar |
+|---|---|---|
+| `internal/domain` | `Call`, `Tool`, `Decision`, `Result` e suas validações | Só a biblioteca padrão, sem `net` nem `os` |
+| `internal/app` | Caso de uso `InterceptCall` e as portas `PolicyEvaluator` e `Upstream` | Biblioteca padrão e `internal/domain` |
+| `internal/adapters/...` | Implementações das portas, como `policystatic` | `internal/app`, `internal/domain` e o que a tecnologia exigir |
+| `cmd/guarita` | Raiz de composição: escolhe os adaptadores e monta os casos de uso | Tudo |
+
+As duas primeiras linhas são verificadas pelo `depguard` no `golangci-lint`; um import fora da lista quebra a CI.
+
 ## Uso seguro e escopo ético
 
 - Execute o cenário apenas no laboratório local deste repositório.
