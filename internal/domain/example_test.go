@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/aluiziodeveloper/guarita/domain"
+	"github.com/aluiziodeveloper/guarita/internal/domain"
 )
 
 // #region domain-example-decision
