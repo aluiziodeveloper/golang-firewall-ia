@@ -44,6 +44,13 @@ linters:
       # aparecer no switch.
       default-signifies-exhaustive: false
   # #endregion
+  exclusions:
+    rules:
+      # Testes leem testdata e iniciam processos de propósito; o gosec
+      # continua valendo para todo o código de produção.
+      - path: _test\.go
+        linters:
+          - gosec
 
 formatters:
   enable:
