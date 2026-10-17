@@ -147,6 +147,8 @@ No Capítulo 5, a referência é `cap05`; `desafio/cap05` traz os testes do ence
 
 No Capítulo 6, a referência é `cap06`; `desafio/cap06` traz os testes da inspeção das respostas do servidor e `cap06-desafio`, a solução.
 
+No Capítulo 7, a referência é `cap07`; `desafio/cap07` traz os testes das origens equivalentes e `cap07-desafio`, a solução.
+
 ## Proxy stdio
 
 A partir do Capítulo 5, a Guarita fica entre o agente e um servidor MCP que fala pelo transporte stdio. Configure o agente para executar a Guarita no lugar do servidor, com o comando do servidor depois de `--`:
@@ -165,6 +167,25 @@ Desde o Capítulo 6, cada mensagem do agente passa por um parser estrito: uma me
 ```
 
 O que for negado ou malformado volta ao agente como erro JSON-RPC e não chega ao servidor.
+
+## Proxy HTTP
+
+A partir do Capítulo 7, a Guarita também protege servidores MCP que falam o transporte Streamable HTTP. Com `-upstream`, ela escuta em `127.0.0.1:8080` e atende em `/mcp`:
+
+```bash
+./guarita -allow read_file -upstream http://127.0.0.1:9000/mcp
+```
+
+O agente passa a usar `http://127.0.0.1:8080/mcp` como endereço do servidor. Cada POST passa pela mesma porta do transporte stdio; GET e DELETE seguem direto, e os eventos do fluxo chegam sem acumular. As opções:
+
+| Opção | Padrão | Efeito |
+|---|---|---|
+| `-listen` | `127.0.0.1:8080` | Endereço de escuta. Fora do loopback, `-host` é obrigatório |
+| `-host` | os nomes do loopback na porta de escuta | Valores aceitos do cabeçalho `Host`, separados por vírgula |
+| `-origin` | nenhum | Origens de navegador aceitas, no formato `http://host:porta` |
+| `-call-timeout` | `30s` | Prazo de cada chamada, inclusive a resposta em fluxo |
+
+Um pedido com `Host` ou `Origin` fora das listas recebe 403: é a defesa contra DNS rebinding. Um corpo acima de 4 MiB recebe 413; um corpo que não chega em 10 segundos, 408; um servidor que não responde no prazo, 504.
 
 ## Arquitetura e regra de imports
 
