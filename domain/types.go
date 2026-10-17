@@ -7,6 +7,8 @@ import "encoding/json"
 type Call struct {
 	ToolName  string
 	Arguments json.RawMessage
+	// CorrelationID liga a chamada aos registros que ela produzir.
+	CorrelationID string
 }
 
 // Tool describes a tool exposed by an MCP server.

@@ -32,6 +32,13 @@ func (call Call) Validate() error {
 		}
 	}
 
+	if strings.TrimSpace(call.CorrelationID) == "" {
+		return &ValidationError{
+			field: "correlation_id",
+			kind:  ErrEmptyCorrelationID,
+		}
+	}
+
 	return nil
 }
 

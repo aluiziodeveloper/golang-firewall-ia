@@ -7,6 +7,9 @@ var (
 	ErrEmptyToolName = errors.New("tool name must not be empty")
 	// ErrInvalidArguments identifies arguments that are not a JSON object.
 	ErrInvalidArguments = errors.New("arguments must be a JSON object")
+	// ErrEmptyCorrelationID identifica uma chamada sem identificador de
+	// correlação utilizável.
+	ErrEmptyCorrelationID = errors.New("correlation id must not be empty")
 	// ErrInvalidDecision identifies a decision outside the supported set.
 	ErrInvalidDecision = errors.New("decision is not supported")
 	// ErrInvalidTrustZone identifies a zone outside the declared set.

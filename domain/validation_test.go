@@ -19,8 +19,9 @@ func TestCallValidate(t *testing.T) {
 		{
 			name: "object arguments",
 			call: Call{
-				ToolName:  "read_file",
-				Arguments: []byte(`{"path":"notes.txt"}`),
+				ToolName:      "read_file",
+				Arguments:     []byte(`{"path":"notes.txt"}`),
+				CorrelationID: "req-1",
 			},
 		},
 		{
@@ -36,18 +37,27 @@ func TestCallValidate(t *testing.T) {
 		// #endregion
 		{
 			name: "empty object arguments",
-			call: Call{ToolName: "read_file", Arguments: []byte(`{}`)},
+			call: Call{
+				ToolName:      "read_file",
+				Arguments:     []byte(`{}`),
+				CorrelationID: "req-1",
+			},
 		},
 		{
 			name: "nested object arguments",
 			call: Call{
-				ToolName:  "read_file",
-				Arguments: []byte(`{"options":{"recursive":true}}`),
+				ToolName:      "read_file",
+				Arguments:     []byte(`{"options":{"recursive":true}}`),
+				CorrelationID: "req-1",
 			},
 		},
 		{
 			name: "whitespace around object",
-			call: Call{ToolName: "read_file", Arguments: []byte(" \n{}\t ")},
+			call: Call{
+				ToolName:      "read_file",
+				Arguments:     []byte(" \n{}\t "),
+				CorrelationID: "req-1",
+			},
 		},
 		{
 			name:      "empty tool name",
