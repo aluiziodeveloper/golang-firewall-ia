@@ -44,6 +44,11 @@ jobs:
       - name: Build
         run: go build ./...
 
+      - name: Fuzz the MCP parser
+        run: >-
+          go test -run '^$' -fuzz FuzzParseMessage -fuzztime 20s
+          ./internal/adapters/mcpproxy
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9.3.0
         with:
