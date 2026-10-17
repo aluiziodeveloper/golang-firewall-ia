@@ -128,6 +128,15 @@ docker compose -f deploy/compose.yaml run --build --rm \
 
 O controle compara nomes e descrições com uma referência local; não autentica o servidor, não verifica sua implementação e não prova que uma ferramenta com descrição legítima se comporte como anunciado. Sem a opção, o laboratório mantém o comportamento anterior.
 
+## Versões por capítulo
+
+Cada capítulo do livro corresponde a uma *tag* anotada. O Capítulo 1 usa `cap01-r1`; a *tag* `cap01` marca a primeira versão do laboratório, em que o pedido padrão já citava a chave e a imagem não compilava, e não reproduz o texto atual. O desafio do capítulo parte da branch `desafio/cap01`, que traz testes vermelhos, e a solução de referência está em `cap01-desafio`.
+
+```bash
+git switch -c meu-desafio-cap01 desafio/cap01
+go test ./cmd/lab-agent
+```
+
 ## Uso seguro e escopo ético
 
 - Execute o cenário apenas no laboratório local deste repositório.
