@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"time"
 
 	"github.com/aluiziodeveloper/guarita/internal/adapters/mcpproxy"
 )
@@ -18,6 +20,12 @@ import (
 // maxBodyBytes limita o corpo de um POST, como o limite de mensagem do
 // transporte stdio.
 const maxBodyBytes = 4 << 20
+
+// Prazos padrão de cada POST.
+const (
+	DefaultCallTimeout = 30 * time.Second
+	DefaultBodyTimeout = 10 * time.Second
+)
 
 // Códigos JSON-RPC das respostas que a própria Guarita produz.
 const (
@@ -27,6 +35,11 @@ const (
 
 // ErrUpstream recusa um endereço de servidor que não seja http ou https.
 var ErrUpstream = errors.New("upstream must be an http or https URL")
+
+var (
+	errSlowBody = errors.New("request body too slow")
+	errReadBody = errors.New("cannot read request body")
+)
 
 // #region mcphttp-admitter
 // Admitter é a porta do Capítulo 6 vista daqui: decide sobre uma
@@ -42,14 +55,35 @@ var _ Admitter = (*mcpproxy.Gate)(nil)
 // Handler é o endpoint MCP da Guarita: inspeciona o que chega por POST
 // e repassa ao servidor pelo proxy reverso.
 type Handler struct {
-	gate  Admitter
-	proxy *httputil.ReverseProxy
+	gate        Admitter
+	proxy       *httputil.ReverseProxy
+	callTimeout time.Duration
+	bodyTimeout time.Duration
 }
+
+// #region mcphttp-options
+// Option ajusta um Handler: é uma opção funcional.
+type Option func(*Handler)
+
+// WithCallTimeout limita cada chamada, da leitura do pedido ao fim da
+// resposta, inclusive quando ela chega em fluxo.
+func WithCallTimeout(d time.Duration) Option {
+	return func(h *Handler) { h.callTimeout = d }
+}
+
+// WithBodyTimeout limita o tempo para o cliente enviar o corpo.
+func WithBodyTimeout(d time.Duration) Option {
+	return func(h *Handler) { h.bodyTimeout = d }
+}
+
+// #endregion
 
 // #region mcphttp-new-handler
 // NewHandler monta o proxy reverso para upstream. Rewrite troca o
 // destino e mantém o caminho do servidor, qualquer que seja o recebido.
-func NewHandler(upstream *url.URL, gate Admitter) (*Handler, error) {
+func NewHandler(
+	upstream *url.URL, gate Admitter, options ...Option,
+) (*Handler, error) {
 	if upstream == nil || upstream.Host == "" ||
 		(upstream.Scheme != "http" && upstream.Scheme != "https") {
 		return nil, ErrUpstream
@@ -62,7 +96,15 @@ func NewHandler(upstream *url.URL, gate Admitter) (*Handler, error) {
 		},
 		ErrorHandler: proxyError,
 	}
-	return &Handler{gate: gate, proxy: proxy}, nil
+	handler := &Handler{
+		gate: gate, proxy: proxy,
+		callTimeout: DefaultCallTimeout,
+		bodyTimeout: DefaultBodyTimeout,
+	}
+	for _, option := range options {
+		option(handler)
+	}
+	return handler, nil
 }
 
 // #endregion
@@ -86,30 +128,52 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // #endregion
 
 // #region mcphttp-post
-// post lê o corpo inteiro, até o limite, e só o repassa se a porta
+// post lê o corpo, dentro dos limites, e só o repassa se a porta
 // deixar. O servidor recebe os mesmos bytes que a porta leu.
 func (h *Handler) post(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), h.callTimeout)
+	defer cancel()
+	body, status, err := h.readBody(w, r)
+	if err != nil {
+		writeError(w, status, codeInvalidRequest, err.Error())
+		return
+	}
+	if forward, reply := h.gate.Admit(ctx, body); !forward {
+		writeJSON(w, replyStatus(reply), reply)
+		return
+	}
+	out := r.Clone(ctx) // o pedido recebido não é alterado
+	out.Body = io.NopCloser(bytes.NewReader(body))
+	out.ContentLength = int64(len(body))
+	h.proxy.ServeHTTP(w, out)
+}
+
+// #endregion
+
+// #region mcphttp-read-body
+// readBody aplica dois limites: tamanho, com MaxBytesReader, e tempo,
+// com o prazo de leitura da conexão, contra o cliente lento.
+func (h *Handler) readBody(
+	w http.ResponseWriter, r *http.Request,
+) ([]byte, int, error) {
+	controller := http.NewResponseController(w)
+	_ = controller.SetReadDeadline(time.Now().Add(h.bodyTimeout))
 	limited := http.MaxBytesReader(w, r.Body, maxBodyBytes)
 	body, err := io.ReadAll(limited)
 	var tooLarge *http.MaxBytesError
 	switch {
 	case errors.As(err, &tooLarge):
-		writeError(w, http.StatusRequestEntityTooLarge,
-			codeInvalidRequest, mcpproxy.ErrMessageTooLarge.Error())
-		return
+		return nil, http.StatusRequestEntityTooLarge,
+			mcpproxy.ErrMessageTooLarge
+	case errors.Is(err, os.ErrDeadlineExceeded):
+		return nil, http.StatusRequestTimeout, errSlowBody
 	case err != nil:
-		writeError(w, http.StatusBadRequest, codeInvalidRequest,
-			"cannot read request body")
-		return
+		return nil, http.StatusBadRequest, errReadBody
 	}
-	if forward, reply := h.gate.Admit(r.Context(), body); !forward {
-		writeJSON(w, replyStatus(reply), reply)
-		return
-	}
-	out := r.Clone(r.Context()) // o pedido recebido não é alterado
-	out.Body = io.NopCloser(bytes.NewReader(body))
-	out.ContentLength = int64(len(body))
-	h.proxy.ServeHTTP(w, out)
+	// Só aqui o prazo sai: com erro, ele precisa valer também para o
+	// descarte do resto do corpo que o servidor faz depois da resposta.
+	_ = controller.SetReadDeadline(time.Time{})
+	return body, http.StatusOK, nil
 }
 
 // #endregion
