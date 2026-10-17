@@ -10,9 +10,14 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/aluiziodeveloper/guarita/internal/adapters/mcpproxy"
 )
+
+// shutdownGrace é quanto o servidor tem para terminar depois que a
+// Guarita fecha a entrada dele.
+const shutdownGrace = 2 * time.Second
 
 const usage = "uso: guarita -- <comando do servidor MCP> [argumentos]"
 
@@ -77,6 +82,13 @@ func startServer(
 	if err != nil {
 		return nil, none, fmt.Errorf("server stdout: %w", err)
 	}
+	// Cancelar fecha a entrada, sinal de fim para um servidor stdio;
+	// só quem não terminar em shutdownGrace é morto.
+	server.Cancel = func() error {
+		_ = in.Close()
+		return nil
+	}
+	server.WaitDelay = shutdownGrace
 	if err := server.Start(); err != nil {
 		return nil, none, fmt.Errorf("start server: %w", err)
 	}
