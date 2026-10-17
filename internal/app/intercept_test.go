@@ -144,3 +144,23 @@ func TestInterceptCall_propagaOContexto(t *testing.T) {
 		t.Fatalf("contexto na política = %v; want req-42", policy.seen)
 	}
 }
+
+func TestInterceptCall_autorizaSemRepassar(t *testing.T) {
+	upstream := &spyUpstream{}
+	for decision, want := range map[domain.Decision]error{
+		domain.DecisionAllow:           nil,
+		domain.DecisionDeny:            ErrPolicyDenied,
+		domain.DecisionRequireApproval: ErrApprovalRequired,
+		"execute":                      ErrPolicyFailed,
+	} {
+		uc := NewInterceptCall(&stubPolicy{decision: decision}, upstream)
+		err := uc.Authorize(context.Background(), validCall)
+		if !errors.Is(err, want) {
+			t.Errorf("Authorize(%s) = %v; want %v", decision, err, want)
+		}
+	}
+	if len(upstream.forwarded) != 0 {
+		t.Fatalf("repasses = %d; Authorize não repassa",
+			len(upstream.forwarded))
+	}
+}

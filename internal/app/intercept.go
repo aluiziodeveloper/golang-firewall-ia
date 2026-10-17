@@ -54,31 +54,44 @@ func NewInterceptCall(
 // #endregion
 
 // #region app-intercept-run
-// Run valida, pergunta à política e só repassa com DecisionAllow.
-// Qualquer outro resultado, inclusive erro, nega a chamada.
+// Run autoriza e, se a decisão for DecisionAllow, repassa ao servidor.
 func (uc *InterceptCall) Run(
 	ctx context.Context, call domain.Call,
 ) (domain.Result, error) {
+	if err := uc.Authorize(ctx, call); err != nil {
+		return domain.Result{}, err
+	}
+	return uc.forward(ctx, call)
+}
+
+// #endregion
+
+// #region app-intercept-authorize
+// Authorize valida a chamada e pergunta à política, sem repassar nada.
+// Devolve nil só para DecisionAllow; qualquer outro caso nega.
+func (uc *InterceptCall) Authorize(
+	ctx context.Context, call domain.Call,
+) error {
 	if err := call.Validate(); err != nil {
-		return domain.Result{}, fmt.Errorf("intercept call: %w", err)
+		return fmt.Errorf("intercept call: %w", err)
 	}
 	decision, err := uc.policy.Evaluate(ctx, call)
 	if err == nil {
 		err = decision.Validate()
 	}
 	if err != nil {
-		return domain.Result{}, fmt.Errorf("intercept call: %w: %w",
+		return fmt.Errorf("intercept call: %w: %w",
 			ErrPolicyFailed, err)
 	}
 	switch decision {
 	case domain.DecisionAllow:
-		return uc.forward(ctx, call)
+		return nil
 	case domain.DecisionRequireApproval:
-		return domain.Result{}, ErrApprovalRequired
+		return ErrApprovalRequired
 	case domain.DecisionDeny:
-		return domain.Result{}, ErrPolicyDenied
+		return ErrPolicyDenied
 	}
-	return domain.Result{}, ErrPolicyFailed
+	return ErrPolicyFailed
 }
 
 // #endregion
