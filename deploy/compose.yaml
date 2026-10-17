@@ -1,5 +1,6 @@
 name: guarita-cap01-lab
 
+# #region deploy-lab-isolation
 x-lab-mcp-server: &lab-mcp-server
   build:
     context: ..
@@ -16,6 +17,7 @@ x-lab-mcp-server: &lab-mcp-server
   read_only: true
   security_opt:
     - no-new-privileges:true
+# #endregion
 
 services:
   ollama:
@@ -92,10 +94,12 @@ services:
     security_opt:
       - no-new-privileges:true
 
+# #region deploy-lab-networks
 networks:
   lab:
     internal: true
   downloads: {}
+# #endregion
 
 volumes:
   ollama_data:

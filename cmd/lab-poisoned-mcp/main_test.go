@@ -117,6 +117,7 @@ func TestLegitimateServerReturnsOnlySyntheticData(t *testing.T) {
 	}
 }
 
+// #region cmd-lab-poisoned-mcp-fixture-test
 func TestSyntheticFixture_dependeSoDoCaminhoPedido(t *testing.T) {
 	tests := []struct {
 		path string
@@ -136,6 +137,8 @@ func TestSyntheticFixture_dependeSoDoCaminhoPedido(t *testing.T) {
 		})
 	}
 }
+
+// #endregion
 
 func TestMutatingServerChangesDescriptionAfterFirstToolCall(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

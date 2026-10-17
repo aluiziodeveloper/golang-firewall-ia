@@ -131,6 +131,7 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 		}
 	}()
 
+	// #region cmd-lab-agent-discovery
 	listed, err := session.ListTools(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("list MCP tools: %w", err)
@@ -148,7 +149,9 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 	availableTools := make(map[string]struct{}, len(listed.Tools))
 	for _, tool := range listed.Tools {
 		if tool.InputSchema == nil {
-			return fmt.Errorf("MCP tool %q has no input schema", tool.Name)
+			return fmt.Errorf(
+				"MCP tool %q has no input schema", tool.Name,
+			)
 		}
 		tools = append(tools, ollamaTool{
 			Type: "function",
@@ -160,6 +163,7 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 		})
 		availableTools[tool.Name] = struct{}{}
 	}
+	// #endregion
 
 	ollama := ollamaClient{
 		baseURL: strings.TrimRight(envOrDefault("OLLAMA_URL", defaultOllamaURL), "/"),
@@ -184,30 +188,39 @@ func runWithOptions(ctx context.Context, prompt string, options runOptions) erro
 			return fmt.Errorf("agent exceeded the limit of %d tool-calling turns", maxToolCallingTurns)
 		}
 
+		// #region cmd-lab-agent-tool-loop
 		for _, call := range response.Message.ToolCalls {
-			if _, ok := availableTools[call.Function.Name]; !ok {
-				return fmt.Errorf("model requested unadvertised MCP tool %q", call.Function.Name)
+			name := call.Function.Name
+			if _, ok := availableTools[name]; !ok {
+				return fmt.Errorf(
+					"model requested unadvertised MCP tool %q", name,
+				)
 			}
 			var arguments any
-			if err := json.Unmarshal(call.Function.Arguments, &arguments); err != nil {
-				return fmt.Errorf("decode arguments for MCP tool %q: %w", call.Function.Name, err)
+			err := json.Unmarshal(call.Function.Arguments, &arguments)
+			if err != nil {
+				return fmt.Errorf(
+					"decode arguments for MCP tool %q: %w", name, err,
+				)
 			}
-			if err := logToolCall(options.toolCallLog, call.Function); err != nil {
+			err = logToolCall(options.toolCallLog, call.Function)
+			if err != nil {
 				return err
 			}
 			result, err := session.CallTool(ctx, &mcp.CallToolParams{
-				Name:      call.Function.Name,
+				Name:      name,
 				Arguments: arguments,
 			})
 			if err != nil {
-				return fmt.Errorf("call MCP tool %q: %w", call.Function.Name, err)
+				return fmt.Errorf("call MCP tool %q: %w", name, err)
 			}
 			messages = append(messages, ollamaMessage{
 				Role:     "tool",
-				ToolName: call.Function.Name,
+				ToolName: name,
 				Content:  toolResultText(result),
 			})
 		}
+		// #endregion
 	}
 
 	return errors.New("agent ended without a final response")
@@ -258,16 +271,24 @@ func validateToolDescriptions(tools []*mcp.Tool) error {
 	return nil
 }
 
+// #region cmd-lab-agent-tool-call-log
 func logToolCall(w io.Writer, call ollamaFunctionCall) error {
 	var arguments bytes.Buffer
 	if err := json.Compact(&arguments, call.Arguments); err != nil {
-		return fmt.Errorf("compact arguments for MCP tool %q: %w", call.Name, err)
+		return fmt.Errorf(
+			"compact arguments for MCP tool %q: %w", call.Name, err,
+		)
 	}
-	if _, err := fmt.Fprintf(w, "tool call: %s %s\n", call.Name, arguments.Bytes()); err != nil {
+	_, err := fmt.Fprintf(
+		w, "tool call: %s %s\n", call.Name, arguments.Bytes(),
+	)
+	if err != nil {
 		return fmt.Errorf("write tool-call log: %w", err)
 	}
 	return nil
 }
+
+// #endregion
 
 func (c ollamaClient) chat(ctx context.Context, messages []ollamaMessage, tools []ollamaTool) (ollamaChatResponse, error) {
 	payload, err := json.Marshal(ollamaChatRequest{
