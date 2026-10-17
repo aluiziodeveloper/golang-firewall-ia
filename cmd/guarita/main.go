@@ -48,7 +48,7 @@ func run(
 		return err
 	}
 	agent := mcpproxy.Endpoint{Reader: stdin, Writer: stdout}
-	stats, relayErr := mcpproxy.Relay(ctx, agent, serverIO)
+	stats, relayErr := mcpproxy.Relay(ctx, agent, serverIO, nil)
 	waitErr := server.Wait() // só depois que o repasse leu tudo
 	_, _ = fmt.Fprintf(stderr, "guarita: %d mensagens do agente, "+
 		"%d do servidor\n", stats.AgentToServer, stats.ServerToAgent)

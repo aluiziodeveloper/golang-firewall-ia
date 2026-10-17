@@ -25,6 +25,9 @@ var (
 	ErrTooDeep      = errors.New("message nesting is too deep")
 	ErrVersion      = errors.New(`jsonrpc must be "2.0"`)
 	ErrShape        = errors.New("not a request, notification or response")
+	// ErrToolCallNotification recusa tools/call sem id, que fugiria da
+	// política e não teria como receber a resposta de negação.
+	ErrToolCallNotification = errors.New("tools/call must be a request")
 )
 
 // Kind classifica uma mensagem JSON-RPC.
@@ -188,8 +191,11 @@ func classify(message Message) Kind {
 // toolCall traduz um pedido tools/call para o domínio. É o único ponto
 // em que o adaptador conhece a forma dos parâmetros do MCP.
 func toolCall(message Message) (domain.Call, bool, error) {
-	if message.Kind != KindRequest || message.Method != "tools/call" {
+	if message.Method != "tools/call" {
 		return domain.Call{}, false, nil
+	}
+	if message.Kind != KindRequest { // sem id, não teria resposta
+		return domain.Call{}, true, ErrToolCallNotification
 	}
 	var params struct {
 		Name      string          `json:"name"`

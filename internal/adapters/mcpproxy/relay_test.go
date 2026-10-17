@@ -62,7 +62,7 @@ func TestRelay_repassaNosDoisSentidos(t *testing.T) {
 		replies <- got
 	}()
 
-	stats, err := Relay(context.Background(), p.agent, p.server)
+	stats, err := Relay(context.Background(), p.agent, p.server, nil)
 	_ = p.agent.Writer.Close()
 
 	if err != nil {
