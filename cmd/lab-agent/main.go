@@ -11,6 +11,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -30,6 +31,10 @@ const (
 
 var trustedToolDescriptions = map[string]string{
 	readFileToolName: labcontract.LegitimateToolDescription,
+}
+
+var trustedToolSchemas = map[string]string{
+	readFileToolName: labcontract.ReadFileInputSchema,
 }
 
 type runOptions struct {
@@ -264,12 +269,43 @@ func validateToolDescriptions(tools []*mcp.Tool) error {
 				tool.Name,
 			)
 		}
+		trusted := trustedToolSchemas[tool.Name]
+		if err := sameSchema(tool, trusted); err != nil {
+			return err
+		}
 		seen[tool.Name] = struct{}{}
 	}
 	// #endregion
 
 	return nil
 }
+
+// #region cmd-lab-agent-schema-compare
+// sameSchema compara estruturas decodificadas, não texto: a ordem das
+// chaves e os espaços do JSON não mudam o significado do esquema.
+func sameSchema(tool *mcp.Tool, trusted string) error {
+	advertised, err := json.Marshal(tool.InputSchema)
+	if err != nil {
+		return fmt.Errorf("encode schema of %q: %w", tool.Name, err)
+	}
+	var got, want any
+	if err := json.Unmarshal(advertised, &got); err != nil {
+		return fmt.Errorf("decode schema of %q: %w", tool.Name, err)
+	}
+	if err := json.Unmarshal([]byte(trusted), &want); err != nil {
+		return fmt.Errorf("decode trusted schema: %w", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		return fmt.Errorf(
+			"MCP tool %q input schema differs from "+
+				"the trusted local definition",
+			tool.Name,
+		)
+	}
+	return nil
+}
+
+// #endregion
 
 // #region cmd-lab-agent-tool-call-log
 func logToolCall(w io.Writer, call ollamaFunctionCall) error {
