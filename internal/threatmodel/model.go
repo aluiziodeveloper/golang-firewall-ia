@@ -87,7 +87,8 @@ func Model() []Threat {
 			edge(agent, out), 18, denialOfService),
 		threat("insecure-parsing",
 			"Mensagem malformada ou ambígua no protocolo",
-			edge(agent, out), 6, tampering, denialOfService),
+			edge(agent, out), 6, tampering, denialOfService,
+		).with(ThreatStatusPartiallyMitigated),
 		threat("approval-forgery",
 			"Aprovação forjada ou obtida por fadiga",
 			edge(operator, out), 12, spoofing, repudiation),
@@ -120,6 +121,13 @@ func threat(
 		DefenseChapter: chapter,
 		Status:         ThreatStatusOpen,
 	}
+}
+
+// with muda o estado de uma ameaça. Pela regra do ADR 0002, só com
+// teste de ataque na suíte do capítulo que trouxe a defesa.
+func (threat Threat) with(status ThreatStatus) Threat {
+	threat.Status = status
+	return threat
 }
 
 func edge(from, to TrustZone) TrustBoundary {
